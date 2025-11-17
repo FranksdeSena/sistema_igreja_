@@ -12,7 +12,7 @@ export interface MediaItem {
   category?: string; // Evento, Celebração, Teste, Outro
   uploadedBy: string; // ID ou nome de quem fez upload
   tags?: string[];
-  status: 'draft' | 'published' | 'archived';
+  status: 'draft' | 'published' | 'archived' | 'syncing'; // 'syncing' para itens pendentes de cloud
   views?: number;
   likes?: number;
   comments?: number;

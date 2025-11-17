@@ -1,7 +1,13 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, map } from 'rxjs';
 import { MediaItem, MediaStats } from '../../shared/models';
+import { MediaStorageService } from './media-storage.service';
 
+/**
+ * Serviço de Mídia com suporte a IndexedDB
+ * Gerencia upload, listagem, busca e estatísticas de mídias
+ * Integrado com armazenamento persistente para produção
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -9,7 +15,12 @@ export class MediaService {
   private mediaItemsSubject = new BehaviorSubject<MediaItem[]>([]);
   private mediaItems$ = this.mediaItemsSubject.asObservable();
 
-  constructor() {}
+  constructor(private storageService: MediaStorageService) {
+    // Sincroniza mídias do armazenamento persistente com memória
+    this.storageService.getMediaItems().subscribe((items) => {
+      this.mediaItemsSubject.next(items);
+    });
+  }
 
   // ========== MÍDIAS ==========
 
@@ -53,22 +64,39 @@ export class MediaService {
       updatedAt: new Date(),
     };
 
-    const current = this.mediaItemsSubject.value;
-    this.mediaItemsSubject.next([...current, newMedia]);
+    // Salva no IndexedDB de forma assincronizada
+    this.storageService
+      .saveMediaItem(newMedia)
+      .then(() => {
+        console.log(`Mídia salva com sucesso: ${newMedia.id}`);
+      })
+      .catch((error) => {
+        console.error('Erro ao salvar mídia:', error);
+      });
   }
 
   updateMedia(id: string, media: Partial<Omit<MediaItem, 'id' | 'createdAt'>>): void {
-    const current = this.mediaItemsSubject.value;
-    const updated = current.map((item) =>
-      item.id === id ? { ...item, ...media, updatedAt: new Date() } : item
-    );
-    this.mediaItemsSubject.next(updated);
+    // Atualiza no IndexedDB de forma assincronizada
+    this.storageService
+      .updateMediaItem(id, media)
+      .then(() => {
+        console.log(`Mídia atualizada: ${id}`);
+      })
+      .catch((error) => {
+        console.error('Erro ao atualizar mídia:', error);
+      });
   }
 
   deleteMedia(id: string): void {
-    const current = this.mediaItemsSubject.value;
-    const filtered = current.filter((item) => item.id !== id);
-    this.mediaItemsSubject.next(filtered);
+    // Deleta do IndexedDB de forma assincronizada
+    this.storageService
+      .deleteMediaItem(id)
+      .then(() => {
+        console.log(`Mídia deletada: ${id}`);
+      })
+      .catch((error) => {
+        console.error('Erro ao deletar mídia:', error);
+      });
   }
 
   publishMedia(id: string): void {

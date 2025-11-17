@@ -68,6 +68,14 @@ import { filter } from 'rxjs';
               📖 Área do Pastor
             </a>
             <a
+              [href]="'/pastor/galeria'"
+              [class.bg-yellow-400]="isActive('/pastor/galeria')"
+              [class.text-blue-900]="isActive('/pastor/galeria')"
+              class="block px-4 py-3 rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm ml-2"
+            >
+              🖼️ Galeria de Mídia
+            </a>
+            <a
               [href]="'/secretaria'"
               [class.bg-yellow-400]="isActive('/secretaria')"
               [class.text-blue-900]="isActive('/secretaria')"

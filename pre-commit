@@ -1,0 +1,62 @@
+#!/bin/bash
+# Pre-commit hook para verificar credenciais
+# Copie para: .git/hooks/pre-commit
+# Dê permissão: chmod +x .git/hooks/pre-commit
+
+set -e
+
+STAGED_FILES=$(git diff --cached --name-only)
+FOUND_SECRETS=0
+
+echo "🔍 Verificando credenciais..."
+
+for file in $STAGED_FILES; do
+  # Ignorar arquivos que DEVEM ter chaves
+  if [[ $file == *"example.ts"* ]]; then
+    continue
+  fi
+  
+  # Verificar environment.ts
+  if [[ $file == "src/environments/environment.ts" ]]; then
+    echo "❌ ERRO: Tentativa de commitar environment.ts com credenciais!"
+    echo "   Adicione 'src/environments/environment.ts' ao .gitignore"
+    FOUND_SECRETS=1
+  fi
+  
+  # Verificar environment.prod.ts
+  if [[ $file == "src/environments/environment.prod.ts" ]]; then
+    echo "❌ ERRO: Tentativa de commitar environment.prod.ts com credenciais!"
+    echo "   Adicione 'src/environments/environment.prod.ts' ao .gitignore"
+    FOUND_SECRETS=1
+  fi
+  
+  # Verificar .env
+  if [[ $file == ".env" ]] || [[ $file == ".env.local" ]]; then
+    echo "❌ ERRO: Tentativa de commitar arquivo .env com credenciais!"
+    FOUND_SECRETS=1
+  fi
+  
+  # Verificar conteúdo suspeito
+  if git show ":$file" | grep -q "supabase.*anonKey\|SUPABASE_KEY\|supabaseKey"; then
+    if [[ ! $file == *"example"* ]]; then
+      echo "⚠️  AVISO: Arquivo $file pode conter chaves Supabase"
+      FOUND_SECRETS=1
+    fi
+  fi
+done
+
+if [ $FOUND_SECRETS -eq 1 ]; then
+  echo ""
+  echo "❌ Commit rejeitado por segurança!"
+  echo ""
+  echo "✅ Como corrigir:"
+  echo "   1. git reset HEAD src/environments/environment.ts"
+  echo "   2. Edite .gitignore para adicionar ambiente files"
+  echo "   3. git add .gitignore"
+  echo "   4. git commit"
+  echo ""
+  exit 1
+fi
+
+echo "✅ Verificação de segurança passou!"
+exit 0
