@@ -1,0 +1,144 @@
+import { Component } from '@angular/core';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { AuthService } from '../../core/services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
+    <div class="min-h-screen bg-gradient-to-br from-primary-blue via-primary-yellow to-primary-orange flex items-center justify-center p-4">
+      <div class="w-full max-w-md">
+        <!-- Card de Login -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+          <!-- Logo/Título -->
+          <div class="text-center mb-8">
+            <div class="inline-block p-4 bg-gradient-to-br from-primary-blue to-primary-orange rounded-xl mb-4">
+              <span class="text-4xl text-white">⛪</span>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900">Sistema Igreja</h1>
+            <p class="text-gray-600 mt-2">Bem-vindo ao gerenciamento de membros</p>
+          </div>
+
+          <!-- Formulário -->
+          <form [formGroup]="loginForm" (ngSubmit)="onLogin()" class="space-y-4">
+            <!-- Email -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                formControlName="email"
+                class="input-field"
+                placeholder="seu@email.com"
+              />
+            </div>
+
+            <!-- Senha -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+              <input
+                type="password"
+                formControlName="password"
+                class="input-field"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <!-- Lembrar senha -->
+            <div class="flex items-center">
+              <input
+                type="checkbox"
+                id="remember"
+                class="rounded border-gray-300"
+              />
+              <label for="remember" class="ml-2 text-sm text-gray-600">
+                Lembrar senha
+              </label>
+            </div>
+
+            <!-- Botão Login -->
+            <button
+              type="submit"
+              [disabled]="isLoading"
+              class="w-full btn-primary mt-6"
+            >
+              <span *ngIf="!isLoading">Entrar</span>
+              <span *ngIf="isLoading" class="flex items-center justify-center">
+                <span class="inline-block animate-spin mr-2">⏳</span>
+                Carregando...
+              </span>
+            </button>
+          </form>
+
+          <!-- Divisor -->
+          <div class="relative my-6">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-gray-300"></div>
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-2 bg-white text-gray-500">Ou</span>
+            </div>
+          </div>
+
+          <!-- Botão Demo -->
+          <button
+            type="button"
+            (click)="onDemoLogin()"
+            class="w-full px-4 py-2 bg-primary-yellow text-gray-900 rounded-lg font-semibold hover:bg-accent-yellow transition-colors duration-200 shadow-md"
+          >
+            Entrar com Demo
+          </button>
+
+          <!-- Footer -->
+          <p class="text-center text-gray-600 text-sm mt-6">
+            Versão 1.0.0 | © 2025 Sistema Igreja
+          </p>
+        </div>
+      </div>
+    </div>
+  `,
+  styles: [],
+})
+export class LoginComponent {
+  loginForm: FormGroup;
+  isLoading = false;
+
+  constructor(
+    private fb: FormBuilder,
+    private authService: AuthService,
+    private router: Router
+  ) {
+    this.loginForm = this.fb.group({
+      email: ['admin@igreja.com', [Validators.required, Validators.email]],
+      password: ['123456', Validators.required],
+    });
+  }
+
+  onLogin(): void {
+    if (this.loginForm.valid) {
+      this.isLoading = true;
+      const { email, password } = this.loginForm.value;
+
+      this.authService.login(email, password).subscribe({
+        next: () => {
+          this.isLoading = false;
+          this.router.navigate(['/dashboard']);
+        },
+        error: (err) => {
+          this.isLoading = false;
+          console.error('Erro ao fazer login:', err);
+        },
+      });
+    }
+  }
+
+  onDemoLogin(): void {
+    this.loginForm.patchValue({
+      email: 'admin@igreja.com',
+      password: '123456',
+    });
+    this.onLogin();
+  }
+}

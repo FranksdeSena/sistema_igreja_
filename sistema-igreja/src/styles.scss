@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background-light text-gray-900 antialiased;
+  }
+
+  h1 {
+    @apply text-4xl font-bold text-gray-900;
+  }
+
+  h2 {
+    @apply text-3xl font-bold text-gray-900;
+  }
+
+  h3 {
+    @apply text-2xl font-bold text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-blue text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors duration-200 shadow-md;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-primary-yellow text-gray-900 rounded-lg font-semibold hover:bg-accent-yellow transition-colors duration-200 shadow-md;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 bg-primary-red text-white rounded-lg font-semibold hover:bg-red-700 transition-colors duration-200 shadow-md;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md p-6 border border-gray-100;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-lg hover:scale-105 transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent;
+  }
+
+  .badge {
+    @apply inline-block px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-blue-100 text-primary-blue;
+  }
+
+  .badge-warning {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-100 text-primary-red;
+  }
+
+  .badge-success {
+    @apply badge bg-green-100 text-green-800;
+  }
+}
