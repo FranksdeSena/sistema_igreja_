@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MembersService } from '../../core/services/members.service';
+import { MembersDatabaseService } from '../../core/services/members-database.service';
 import { Member } from '../../shared/models';
 
 @Component({
@@ -182,7 +182,7 @@ export class MemberFormComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private membersService: MembersService,
+    private membersService: MembersDatabaseService,
     private route: ActivatedRoute,
     private router: Router
   ) {
@@ -222,7 +222,7 @@ export class MemberFormComponent implements OnInit {
     });
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (this.form.invalid) return;
 
     this.isLoading = true;
@@ -236,22 +236,22 @@ export class MemberFormComponent implements OnInit {
       joinDate: new Date(formValue.joinDate),
     };
 
-    if (this.isEditMode && this.memberId) {
-      this.membersService.updateMember(this.memberId, memberData).subscribe((result) => {
-        this.isLoading = false;
-        if (result) {
-          this.router.navigate(['/members']);
-        }
-      });
-    } else {
-      this.membersService.addMember(memberData).subscribe(() => {
-        this.isLoading = false;
-        this.router.navigate(['/members']);
-      });
+    try {
+      if (this.isEditMode && this.memberId) {
+        await this.membersService.updateMember(this.memberId, memberData);
+      } else {
+        await this.membersService.addMember(memberData);
+      }
+      this.router.navigate(['/dashboard/membros']);
+    } catch (error) {
+      console.error('Erro ao salvar membro:', error);
+      alert('Erro ao salvar membro. Tente novamente.');
+    } finally {
+      this.isLoading = false;
     }
   }
 
   onCancel(): void {
-    this.router.navigate(['/members']);
+    this.router.navigate(['/dashboard/membros']);
   }
 }

@@ -1,214 +1,192 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { MembersService } from '../../core/services/members.service';
+import { RouterModule } from '@angular/router';
+import { FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { MembersDatabaseService } from '../../core/services/members-database.service';
+import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
 import { Member } from '../../shared/models';
+import { Observable, combineLatest } from 'rxjs';
+import { map, startWith, debounceTime } from 'rxjs/operators';
 
 @Component({
   selector: 'app-members',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule],
   template: `
     <div class="space-y-6">
       <!-- Header -->
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Gestão de Membros</h1>
-          <p class="text-sm text-gray-600 mt-2">Administre os membros da sua igreja</p>
+          <h2 class="text-2xl font-bold text-gray-800">Membros</h2>
+          <p class="text-gray-500">Gerencie os membros da igreja</p>
         </div>
-        <button routerLink="novo" class="btn-primary flex items-center gap-2">
+        <button *ngIf="isAdmin()" routerLink="novo" class="btn-primary flex items-center gap-2">
           <span>➕</span>
           <span>Novo Membro</span>
         </button>
       </div>
 
-      <!-- Barra de Pesquisa -->
-      <div class="card">
-        <div class="flex gap-4 items-center">
-          <input
-            type="text"
-            [(ngModel)]="searchQuery"
-            (input)="onSearch()"
-            placeholder="Pesquisar por nome ou telefone..."
-            class="input-field flex-1"
-          />
-          <button (click)="onSearch()" class="btn-primary">🔍 Buscar</button>
+      <!-- Filtros e Busca -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div class="flex flex-col md:flex-row gap-4">
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <input
+              type="text"
+              [formControl]="searchControl"
+              placeholder="Buscar por nome, email ou telefone..."
+              class="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary-blue focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+            />
+          </div>
+          <select 
+            [formControl]="statusControl"
+            class="px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-blue outline-none bg-white">
+            <option value="">Todos os Status</option>
+            <option value="active">Ativo</option>
+            <option value="inactive">Inativo</option>
+          </select>
         </div>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="card-hover">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-600 text-sm">Total de Membros</p>
-              <p class="text-3xl font-bold text-primary-blue mt-2">{{ members.length }}</p>
-            </div>
-            <span class="text-5xl opacity-20">👥</span>
-          </div>
-        </div>
-        <div class="card-hover">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-600 text-sm">Membros Ativos</p>
-              <p class="text-3xl font-bold text-green-600 mt-2">
-                {{ countByStatus('active') }}
-              </p>
-            </div>
-            <span class="text-5xl opacity-20">✅</span>
-          </div>
-        </div>
-        <div class="card-hover">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-600 text-sm">Visitantes</p>
-              <p class="text-3xl font-bold text-primary-orange mt-2">
-                {{ countByStatus('visiting') }}
-              </p>
-            </div>
-            <span class="text-5xl opacity-20">🤝</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tabela de Membros -->
-      <div class="card">
+      <!-- Lista de Membros -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full">
-            <thead class="bg-background-gray border-b border-gray-300">
+            <thead class="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-900">Nome</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-900">WhatsApp</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-900">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-900">Função</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-900">Ações</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Membro</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contato</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Papel</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" *ngIf="isAdmin()">Ações</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr *ngFor="let member of members" class="hover:bg-background-gray transition-colors">
-                <td class="px-6 py-2">
-                  <div class="flex items-center gap-2">
-                    <span class="text-lg">{{ member.photo || '👤' }}</span>
-                    <div>
-                      <p class="font-medium text-gray-900 text-sm">{{ member.name }}</p>
-                      <p class="text-xs text-gray-600">{{ formatDate(member.joinDate) }}</p>
+            <tbody class="divide-y divide-gray-100">
+              <tr *ngFor="let member of filteredMembers$ | async" class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex items-center">
+                    <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-xl">
+                      {{ member.photo || '👤' }}
+                    </div>
+                    <div class="ml-4">
+                      <div class="text-sm font-medium text-gray-900">{{ member.name }}</div>
+                      <div class="text-xs text-gray-500">Desde {{ member.joinDate | date:'MM/yyyy' }}</div>
                     </div>
                   </div>
                 </td>
-                <td class="px-6 py-2">
-                  <a
-                    [href]="'https://wa.me/' + cleanPhone(member.whatsapp)"
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm text-gray-900">{{ member.email }}</div>
+                  <a 
+                    *ngIf="member.whatsapp" 
+                    [href]="getWhatsAppLink(member.whatsapp)" 
                     target="_blank"
-                    class="text-green-600 hover:underline flex items-center gap-1 text-sm"
+                    class="text-sm text-green-600 hover:text-green-800 flex items-center gap-1 mt-1"
+                    title="Abrir conversa no WhatsApp"
                   >
-                    <span>💬</span>
-                    {{ member.whatsapp }}
+                    <span>📱</span>
+                    <span>{{ member.whatsapp }}</span>
                   </a>
+                  <div *ngIf="!member.whatsapp" class="text-sm text-gray-500">{{ member.phone }}</div>
                 </td>
-                <td class="px-6 py-2">
-                  <span [ngClass]="getStatusBadgeClass(member.status)" class="badge text-xs">
-                    {{ getStatusLabel(member.status) }}
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                    [ngClass]="{
+                      'bg-green-100 text-green-800': member.status === 'active',
+                      'bg-red-100 text-red-800': member.status === 'inactive'
+                    }">
+                    {{ member.status === 'active' ? 'Ativo' : 'Inativo' }}
                   </span>
                 </td>
-                <td class="px-6 py-2">
-                  <span class="badge badge-primary text-xs">{{ member.role || 'Membro' }}</span>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ member.role }}
                 </td>
-                <td class="px-6 py-2">
-                  <div class="flex gap-1">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" *ngIf="isAdmin()">
+                  <div class="flex gap-2">
                     <button
                       [routerLink]="['editar', member.id]"
-                      class="px-3 py-1 bg-primary-blue text-white rounded text-sm hover:bg-blue-600 transition-colors"
+                      class="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded transition-colors"
+                      title="Editar"
                     >
                       ✏️
                     </button>
                     <button
-                      (click)="onDelete(member.id)"
-                      class="px-3 py-1 bg-primary-red text-white rounded text-sm hover:bg-red-700 transition-colors"
+                      (click)="deleteMember(member.id)"
+                      class="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded transition-colors"
+                      title="Excluir"
                     >
                       🗑️
                     </button>
                   </div>
                 </td>
               </tr>
+              <tr *ngIf="(filteredMembers$ | async)?.length === 0">
+                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                  Nenhum membro encontrado.
+                </td>
+              </tr>
             </tbody>
           </table>
-
-          <!-- Mensagem vazia -->
-          <div *ngIf="members.length === 0" class="text-center py-12">
-            <p class="text-gray-500 text-lg">Nenhum membro encontrado</p>
-          </div>
         </div>
       </div>
     </div>
   `,
-  styles: [],
+  styles: []
 })
 export class MembersComponent implements OnInit {
-  members: Member[] = [];
-  searchQuery = '';
+  filteredMembers$: Observable<Member[]>;
+  searchControl = new FormControl('');
+  statusControl = new FormControl('');
+  currentUserRole: string | null = null;
 
-  constructor(private membersService: MembersService) {}
+  constructor(
+    private membersService: MembersDatabaseService,
+    private authService: FirebaseAuthService
+  ) {
+    // Combina os filtros com a lista de membros
+    this.filteredMembers$ = combineLatest([
+      this.membersService.getMembers(),
+      this.searchControl.valueChanges.pipe(startWith(''), debounceTime(300)),
+      this.statusControl.valueChanges.pipe(startWith(''))
+    ]).pipe(
+      map(([members, searchTerm, statusFilter]) => {
+        return members.filter(member => {
+          const matchesSearch = !searchTerm || 
+            member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            member.phone?.includes(searchTerm);
+            
+          const matchesStatus = !statusFilter || member.status === statusFilter;
+          
+          return matchesSearch && matchesStatus;
+        });
+      })
+    );
+  }
 
   ngOnInit(): void {
-    this.loadMembers();
-  }
-
-  loadMembers(): void {
-    this.membersService.getMembers().subscribe((members) => {
-      this.members = members;
+    this.authService.currentUser$.subscribe(user => {
+      this.currentUserRole = user?.role || null;
     });
   }
 
-  onSearch(): void {
-    if (this.searchQuery.trim()) {
-      this.membersService.searchMembers(this.searchQuery).subscribe((members) => {
-        this.members = members;
+  isAdmin(): boolean {
+    return this.currentUserRole === 'admin';
+  }
+
+  getWhatsAppLink(phone: string): string {
+    // Remove todos os caracteres não numéricos
+    const cleanPhone = phone.replace(/\D/g, '');
+    return `https://wa.me/${cleanPhone}`;
+  }
+
+  deleteMember(id: string): void {
+    if (confirm('Tem certeza que deseja excluir este membro?')) {
+      this.membersService.deleteMember(id).then(() => {
+        // Feedback visual se necessário
+      }).catch(error => {
+        console.error('Erro ao excluir membro:', error);
+        alert('Erro ao excluir membro. Tente novamente.');
       });
-    } else {
-      this.loadMembers();
     }
-  }
-
-  onDelete(id: string): void {
-    if (confirm('Tem certeza que deseja deletar este membro?')) {
-      this.membersService.deleteMember(id).subscribe(() => {
-        this.loadMembers();
-      });
-    }
-  }
-
-  formatDate(date: Date): string {
-    return new Date(date).toLocaleDateString('pt-BR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  }
-
-  cleanPhone(phone: string): string {
-    return phone.replace(/\D/g, '');
-  }
-
-  getStatusLabel(status: string): string {
-    const labels: { [key: string]: string } = {
-      active: 'Ativo',
-      inactive: 'Inativo',
-      visiting: 'Visitante',
-    };
-    return labels[status] || status;
-  }
-
-  getStatusBadgeClass(status: string): string {
-    const classes: { [key: string]: string } = {
-      active: 'badge-success',
-      inactive: 'bg-gray-100 text-gray-800',
-      visiting: 'badge-warning',
-    };
-    return classes[status] || 'badge-primary';
-  }
-
-  countByStatus(status: string): number {
-    return this.members.filter((m) => m.status === status).length;
   }
 }

@@ -1,14 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { FinanceService } from '../../core/services/finance.service';
+import { FinanceDatabaseService } from '../../core/services/finance-database.service';
 import { Transaction, FinancialSummary } from '../../shared/models';
+import { Observable, combineLatest } from 'rxjs';
+import { map, startWith, debounceTime } from 'rxjs/operators';
 
 @Component({
   selector: 'app-finance',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -27,21 +29,6 @@ import { Transaction, FinancialSummary } from '../../shared/models';
         </button>
       </div>
 
-      <!-- Barra de Pesquisa -->
-      <div class="card">
-        <div class="flex flex-col md:flex-row gap-4 items-center">
-          <input
-            type="text"
-            [(ngModel)]="searchQuery"
-            (input)="onSearch()"
-            placeholder="Pesquisar por descrição, categoria ou beneficiário..."
-            class="input-field flex-1 w-full md:w-auto"
-          />
-          <button (click)="onSearch()" class="btn-primary">🔍 Buscar</button>
-          <button (click)="clearSearch()" class="btn-secondary">Limpar</button>
-        </div>
-      </div>
-
       <!-- Stats Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <!-- Total Receitas -->
@@ -49,10 +36,11 @@ import { Transaction, FinancialSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Total Receitas</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-green-600 break-words">
-              R$ {{ summary.totalIncome | number : '1.2-2' }}
+              R$ {{ (summary$ | async)?.totalIncome | number : '1.2-2' }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">💰</span>
           </div>
+          <p class="text-xs text-gray-500 mt-1">Tempo real</p>
         </div>
 
         <!-- Total Despesas -->
@@ -60,27 +48,29 @@ import { Transaction, FinancialSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Total Despesas</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-red-600 break-words">
-              R$ {{ summary.totalExpense | number : '1.2-2' }}
+              R$ {{ (summary$ | async)?.totalExpense | number : '1.2-2' }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">💸</span>
           </div>
+          <p class="text-xs text-gray-500 mt-1">Tempo real</p>
         </div>
 
         <!-- Saldo -->
         <div
           class="card-hover p-4 md:p-5"
-          [ngClass]="summary.balance >= 0 ? 'bg-green-50' : 'bg-red-50'"
+          [ngClass]="((summary$ | async)?.balance || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'"
         >
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Saldo</p>
           <div class="flex items-end justify-between gap-3">
             <p
               class="text-lg md:text-xl font-bold break-words"
-              [ngClass]="summary.balance >= 0 ? 'text-green-600' : 'text-red-600'"
+              [ngClass]="((summary$ | async)?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
             >
-              R$ {{ summary.balance | number : '1.2-2' }}
+              R$ {{ (summary$ | async)?.balance | number : '1.2-2' }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">📊</span>
           </div>
+          <p class="text-xs text-gray-500 mt-1">Tempo real</p>
         </div>
 
         <!-- Pendentes -->
@@ -88,10 +78,11 @@ import { Transaction, FinancialSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Pendentes</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-yellow-600 break-words">
-              R$ {{ summary.pendingAmount | number : '1.2-2' }}
+              R$ {{ (summary$ | async)?.pendingAmount | number : '1.2-2' }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">⏳</span>
           </div>
+          <p class="text-xs text-gray-500 mt-1">Tempo real</p>
         </div>
 
         <!-- Total Transações -->
@@ -99,33 +90,33 @@ import { Transaction, FinancialSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Transações</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-primary-blue">
-              {{ summary.transactionCount }}
+              {{ (summary$ | async)?.transactionCount }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">📝</span>
           </div>
+          <p class="text-xs text-gray-500 mt-1">Tempo real</p>
         </div>
       </div>
+
       <!-- Filtros -->
       <div class="card">
-        <div class="flex flex-col md:flex-row gap-4">
-          <select [(ngModel)]="selectedType" (change)="onTypeChange()" class="input-field flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <input
+            type="text"
+            [formControl]="searchControl"
+            placeholder="Pesquisar por descrição ou categoria..."
+            class="input-field"
+          />
+          <select [formControl]="typeControl" class="input-field">
             <option value="">Todos os Tipos</option>
             <option value="income">Receitas</option>
             <option value="expense">Despesas</option>
           </select>
-          <select
-            [(ngModel)]="selectedCategory"
-            (change)="onCategoryChange()"
-            class="input-field flex-1"
-          >
+          <select [formControl]="categoryControl" class="input-field">
             <option value="">Todas as Categorias</option>
             <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
           </select>
-          <select
-            [(ngModel)]="selectedStatus"
-            (change)="onStatusChange()"
-            class="input-field flex-1"
-          >
+          <select [formControl]="statusControl" class="input-field">
             <option value="">Todos os Status</option>
             <option value="completed">Concluído</option>
             <option value="pending">Pendente</option>
@@ -150,7 +141,7 @@ import { Transaction, FinancialSummary } from '../../shared/models';
           </thead>
           <tbody>
             <tr
-              *ngFor="let transaction of filteredTransactions"
+              *ngFor="let transaction of filteredTransactions$ | async"
               class="border-t hover:bg-gray-50 transition"
             >
               <td class="px-4 py-3 text-sm text-gray-800">
@@ -200,7 +191,7 @@ import { Transaction, FinancialSummary } from '../../shared/models';
 
       <!-- Cards de Transações (Mobile) -->
       <div class="md:hidden space-y-4">
-        <div *ngFor="let transaction of filteredTransactions" class="card-hover">
+        <div *ngFor="let transaction of filteredTransactions$ | async" class="card-hover">
           <div class="flex justify-between items-start mb-3">
             <div>
               <p class="text-sm font-semibold text-gray-900">{{ transaction.description }}</p>
@@ -235,7 +226,7 @@ import { Transaction, FinancialSummary } from '../../shared/models';
       </div>
 
       <!-- Mensagem vazia -->
-      <div *ngIf="filteredTransactions.length === 0" class="card-hover text-center py-12">
+      <div *ngIf="(filteredTransactions$ | async)?.length === 0" class="card-hover text-center py-12">
         <p class="text-gray-600 text-lg">📭 Nenhuma transação encontrada</p>
         <p class="text-gray-500 text-sm mt-2">Clique em "Nova Transação" para começar</p>
       </div>
@@ -243,100 +234,56 @@ import { Transaction, FinancialSummary } from '../../shared/models';
   `,
 })
 export class FinanceComponent implements OnInit {
-  transactions: Transaction[] = [];
-  filteredTransactions: Transaction[] = [];
-  summary: FinancialSummary = {
-    totalIncome: 0,
-    totalExpense: 0,
-    balance: 0,
-    transactionCount: 0,
-    pendingAmount: 0,
-  };
-
-  searchQuery = '';
-  selectedType = '';
-  selectedCategory = '';
-  selectedStatus = '';
+  filteredTransactions$: Observable<Transaction[]>;
+  summary$: Observable<FinancialSummary>;
+  
+  searchControl = new FormControl('');
+  typeControl = new FormControl('');
+  categoryControl = new FormControl('');
+  statusControl = new FormControl('');
+  
   categories: string[] = [];
 
-  constructor(private financeService: FinanceService) {}
+  constructor(private financeService: FinanceDatabaseService) {
+    // Combinar filtros reativos
+    this.filteredTransactions$ = combineLatest([
+      this.financeService.getTransactions(),
+      this.searchControl.valueChanges.pipe(startWith(''), debounceTime(300)),
+      this.typeControl.valueChanges.pipe(startWith('')),
+      this.categoryControl.valueChanges.pipe(startWith('')),
+      this.statusControl.valueChanges.pipe(startWith(''))
+    ]).pipe(
+      map(([transactions, search, type, category, status]) => {
+        return transactions.filter(t => {
+          const matchesSearch = !search || 
+            t.description.toLowerCase().includes(search.toLowerCase()) ||
+            t.category.toLowerCase().includes(search.toLowerCase());
+          
+          const matchesType = !type || t.type === type;
+          const matchesCategory = !category || t.category === category;
+          const matchesStatus = !status || t.status === status;
+          
+          return matchesSearch && matchesType && matchesCategory && matchesStatus;
+        });
+      })
+    );
+
+    // Resumo financeiro em tempo real
+    this.summary$ = this.financeService.getFinancialSummary();
+  }
 
   ngOnInit(): void {
-    this.loadTransactions();
-    this.loadSummary();
     this.categories = this.financeService.getCategories();
   }
 
-  loadTransactions(): void {
-    this.financeService.getTransactions().subscribe((transactions) => {
-      this.transactions = transactions;
-      this.applyFilters();
-    });
-  }
-
-  loadSummary(): void {
-    this.financeService.getFinancialSummary().subscribe((summary) => {
-      this.summary = summary;
-    });
-  }
-
-  onSearch(): void {
-    this.applyFilters();
-  }
-
-  clearSearch(): void {
-    this.searchQuery = '';
-    this.selectedType = '';
-    this.selectedCategory = '';
-    this.selectedStatus = '';
-    this.applyFilters();
-  }
-
-  onTypeChange(): void {
-    this.applyFilters();
-  }
-
-  onCategoryChange(): void {
-    this.applyFilters();
-  }
-
-  onStatusChange(): void {
-    this.applyFilters();
-  }
-
-  applyFilters(): void {
-    let filtered = this.transactions;
-
-    if (this.searchQuery) {
-      filtered = filtered.filter(
-        (t) =>
-          t.description.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-          t.category.toLowerCase().includes(this.searchQuery.toLowerCase())
-      );
-    }
-
-    if (this.selectedType) {
-      filtered = filtered.filter((t) => t.type === this.selectedType);
-    }
-
-    if (this.selectedCategory) {
-      filtered = filtered.filter((t) => t.category === this.selectedCategory);
-    }
-
-    if (this.selectedStatus) {
-      filtered = filtered.filter((t) => t.status === this.selectedStatus);
-    }
-
-    this.filteredTransactions = filtered.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }
-
-  onDelete(id: string): void {
+  async onDelete(id: string): Promise<void> {
     if (confirm('Tem certeza que deseja deletar esta transação?')) {
-      this.financeService.deleteTransaction(id);
-      this.loadTransactions();
-      this.loadSummary();
+      try {
+        await this.financeService.deleteTransaction(id);
+      } catch (error) {
+        console.error('Erro ao deletar transação:', error);
+        alert('Erro ao deletar transação. Tente novamente.');
+      }
     }
   }
 

@@ -3,8 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { PastorService } from '../../core/services/pastor.service';
 import { MediaService } from '../../core/services/media.service';
+import { MembersDatabaseService } from '../../core/services/members-database.service';
+import { FinanceDatabaseService } from '../../core/services/finance-database.service';
+import { EventsDatabaseService } from '../../core/services/events-database.service';
 import { PastorDailyMessage, Sermon, MediaItem } from '../../shared/models';
 import { MediaViewerComponent } from '../../shared/components/media-viewer.component';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard-home',
@@ -35,8 +39,8 @@ import { MediaViewerComponent } from '../../shared/components/media-viewer.compo
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm font-medium">Total de Membros</p>
-              <p class="text-4xl font-bold text-primary-blue mt-2">1.234</p>
-              <p class="text-xs text-green-600 mt-2">↑ 12 novos este mês</p>
+              <p class="text-4xl font-bold text-primary-blue mt-2">{{ totalMembers$ | async }}</p>
+              <p class="text-xs text-gray-500 mt-2">Sincronizado em tempo real</p>
             </div>
             <div class="text-5xl opacity-20">👥</div>
           </div>
@@ -47,8 +51,8 @@ import { MediaViewerComponent } from '../../shared/components/media-viewer.compo
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm font-medium">Dízimos (Mês)</p>
-              <p class="text-4xl font-bold text-primary-blue mt-2">1.234</p>
-              <p class="text-xs text-green-600 mt-2">↑ 8% vs mês anterior</p>
+              <p class="text-4xl font-bold text-green-600 mt-2">R$ {{ totalIncome$ | async | number:'1.2-2' }}</p>
+              <p class="text-xs text-gray-500 mt-2">Total de receitas</p>
             </div>
             <div class="text-5xl opacity-20">💰</div>
           </div>
@@ -59,8 +63,8 @@ import { MediaViewerComponent } from '../../shared/components/media-viewer.compo
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm font-medium">Ofertas (Mês)</p>
-              <p class="text-4xl font-bold text-primary-orange mt-2">R$ 2.150</p>
-              <p class="text-xs text-green-600 mt-2">↑ 5% vs mês anterior</p>
+              <p class="text-4xl font-bold text-red-600 mt-2">R$ {{ totalExpense$ | async | number:'1.2-2' }}</p>
+              <p class="text-xs text-gray-500 mt-2">Total de despesas</p>
             </div>
             <div class="text-5xl opacity-20">🎁</div>
           </div>
@@ -71,8 +75,8 @@ import { MediaViewerComponent } from '../../shared/components/media-viewer.compo
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm font-medium">Eventos Próximos</p>
-              <p class="text-4xl font-bold text-primary-red mt-2">5</p>
-              <p class="text-xs text-blue-600 mt-2">Próximo: Batismo - 28/11</p>
+              <p class="text-4xl font-bold text-primary-red mt-2">{{ upcomingEvents$ | async }}</p>
+              <p class="text-xs text-gray-500 mt-2">Sincronizado em tempo real</p>
             </div>
             <div class="text-5xl opacity-20">📅</div>
           </div>
@@ -340,7 +344,25 @@ export class DashboardHomeComponent implements OnInit {
   selectedMediaItem: MediaItem | null = null;
   selectedMediaIndex = 0;
 
-  constructor(private pastorService: PastorService, private mediaService: MediaService) {}
+  // Observables em tempo real
+  totalMembers$: Observable<number>;
+  totalIncome$: Observable<number>;
+  totalExpense$: Observable<number>;
+  upcomingEvents$: Observable<number>;
+
+  constructor(
+    private pastorService: PastorService,
+    private mediaService: MediaService,
+    private membersService: MembersDatabaseService,
+    private financeService: FinanceDatabaseService,
+    private eventsService: EventsDatabaseService
+  ) {
+    // Inicializar observables
+    this.totalMembers$ = this.membersService.getTotalMembersCount();
+    this.totalIncome$ = this.financeService.getTotalIncome();
+    this.totalExpense$ = this.financeService.getTotalExpense();
+    this.upcomingEvents$ = this.eventsService.getUpcomingEventsCount();
+  }
 
   ngOnInit(): void {
     this.loadDashboardData();

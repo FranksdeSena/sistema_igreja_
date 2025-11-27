@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { EventService } from '../../core/services/event.service';
+import { EventsDatabaseService } from '../../core/services/events-database.service';
 import { Event } from '../../shared/models';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-event-form',
@@ -40,7 +41,7 @@ import { Event } from '../../shared/models';
                   *ngIf="form.get('name')?.invalid && form.get('name')?.touched"
                   class="text-sm text-red-600"
                 >
-                  Nome é obrigatório
+                  Nome é obrigatório (mínimo 3 caracteres)
                 </span>
               </div>
 
@@ -235,15 +236,16 @@ import { Event } from '../../shared/models';
     </div>
   `,
 })
-export class EventFormComponent implements OnInit {
+export class EventFormComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   isEditMode = false;
   eventId?: string;
   categories: string[] = [];
+  private subscription?: Subscription;
 
   constructor(
     private fb: FormBuilder,
-    private eventService: EventService,
+    private eventsService: EventsDatabaseService,
     private route: ActivatedRoute,
     private router: Router
   ) {
@@ -251,7 +253,7 @@ export class EventFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.categories = this.eventService.getCategories();
+    this.categories = this.eventsService.getCategories();
 
     this.route.params.subscribe((params) => {
       if (params['id']) {
@@ -260,6 +262,12 @@ export class EventFormComponent implements OnInit {
         this.loadEvent(params['id']);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 
   private initForm(): void {
@@ -280,30 +288,42 @@ export class EventFormComponent implements OnInit {
   }
 
   private loadEvent(id: string): void {
-    const event = this.eventService.getEvent(id);
-    if (event) {
-      const dateStr = new Date(event.date).toISOString().split('T')[0];
+    this.subscription = this.eventsService.getEventById(id).subscribe({
+      next: (event) => {
+        if (event) {
+          const dateStr = new Date(event.date).toISOString().split('T')[0];
+          
+          const patchData = {
+            name: event.name,
+            description: event.description || '',
+            date: dateStr,
+            time: event.time || '10:00',
+            location: event.location,
+            category: event.category,
+            capacity: Number(event.capacity),
+            registered: Number(event.registered),
+            status: event.status,
+            responsible: event.responsible || '',
+            coordinator: event.coordinator || '',
+            notes: event.notes || '',
+          };
 
-      const patchData = {
-        name: event.name,
-        description: event.description,
-        date: dateStr,
-        time: event.time,
-        location: event.location,
-        category: event.category,
-        capacity: Number(event.capacity),
-        registered: Number(event.registered),
-        status: event.status,
-        responsible: event.responsible,
-        coordinator: event.coordinator || '',
-        notes: event.notes || '',
-      };
-
-      this.form.patchValue(patchData);
-    }
+          this.form.patchValue(patchData);
+        } else {
+          console.error('Evento não encontrado');
+          alert('Evento não encontrado!');
+          this.router.navigate(['/dashboard/eventos']);
+        }
+      },
+      error: (error) => {
+        console.error('Erro ao carregar evento:', error);
+        alert('Erro ao carregar evento. Tente novamente.');
+        this.router.navigate(['/dashboard/eventos']);
+      }
+    });
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (this.form.invalid) {
       Object.keys(this.form.controls).forEach((key) => {
         const control = this.form.get(key);
@@ -311,16 +331,19 @@ export class EventFormComponent implements OnInit {
           control.markAsTouched();
         }
       });
-      console.warn('❌ Formulário inválido');
+      alert('Por favor, preencha todos os campos obrigatórios corretamente.');
       return;
     }
 
     const formValue = this.form.value;
 
+    // Combinar data e hora
+    const dateTime = new Date(`${formValue.date}T${formValue.time}`);
+
     const eventData: any = {
       name: formValue.name,
       description: formValue.description || '',
-      date: new Date(formValue.date),
+      date: dateTime,
       time: formValue.time,
       location: formValue.location,
       category: formValue.category,
@@ -331,25 +354,25 @@ export class EventFormComponent implements OnInit {
       coordinator: formValue.coordinator || '',
       notes: formValue.notes || '',
       churchId: 'church-1',
-      createdBy: 'Sistema',
     };
 
     try {
       if (this.isEditMode && this.eventId) {
-        this.eventService.updateEvent(this.eventId, eventData);
-        console.log('✅ Evento atualizado:', this.eventId);
+        await this.eventsService.updateEvent(this.eventId, eventData);
+        alert('Evento atualizado com sucesso!');
       } else {
-        this.eventService.createEvent(eventData);
-        console.log('✅ Evento criado');
+        await this.eventsService.addEvent(eventData);
+        alert('Evento criado com sucesso!');
       }
 
-      this.router.navigate(['/events']);
+      await this.router.navigate(['/dashboard/eventos']);
     } catch (error) {
-      console.error('❌ Erro ao salvar evento:', error);
+      console.error('Erro ao salvar evento:', error);
+      alert(`Erro ao salvar evento: ${error}`);
     }
   }
 
-  onCancel(): void {
-    this.router.navigate(['/events']);
+  async onCancel(): Promise<void> {
+    await this.router.navigate(['/dashboard/eventos']);
   }
 }

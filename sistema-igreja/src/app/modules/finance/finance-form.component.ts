@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FinanceService } from '../../core/services/finance.service';
+import { FinanceDatabaseService } from '../../core/services/finance-database.service';
 import { Transaction } from '../../shared/models';
 
 @Component({
@@ -225,7 +225,7 @@ export class FinanceFormComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private financeService: FinanceService,
+    private financeService: FinanceDatabaseService,
     private route: ActivatedRoute,
     private router: Router
   ) {
@@ -263,46 +263,45 @@ export class FinanceFormComponent implements OnInit {
   }
 
   private loadTransaction(id: string): void {
-    const transaction = this.financeService.getTransaction(id);
-    if (transaction) {
-      const dateStr = new Date(transaction.date).toISOString().split('T')[0];
+    this.financeService.getTransactionById(id).subscribe(transaction => {
+      if (transaction) {
+        const dateStr = new Date(transaction.date).toISOString().split('T')[0];
 
-      // Resetar com valores da transação
-      const patchData = {
-        type: transaction.type,
-        category: transaction.category,
-        description: transaction.description,
-        amount: Number(transaction.amount),
-        date: dateStr,
-        paymentMethod: transaction.paymentMethod,
-        status: transaction.status,
-        paidBy: transaction.paidBy || '',
-        paidTo: transaction.paidTo || '',
-        reference: transaction.reference || '',
-        createdBy: transaction.createdBy || '',
-        notes: transaction.notes || '',
-      };
+        const patchData = {
+          type: transaction.type,
+          category: transaction.category,
+          description: transaction.description,
+          amount: Number(transaction.amount),
+          date: dateStr,
+          paymentMethod: transaction.paymentMethod,
+          status: transaction.status,
+          paidBy: transaction.paidBy || '',
+          paidTo: transaction.paidTo || '',
+          reference: transaction.reference || '',
+          createdBy: transaction.createdBy || '',
+          notes: transaction.notes || '',
+        };
 
-      this.form.patchValue(patchData);
-    }
+        this.form.patchValue(patchData);
+      }
+    });
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (this.form.invalid) {
-      // Marcar todos os campos como touched para mostrar erros
       Object.keys(this.form.controls).forEach((key) => {
         const control = this.form.get(key);
         if (control) {
           control.markAsTouched();
         }
       });
-      console.warn('❌ Formulário inválido');
+      
+      alert('Por favor, preencha todos os campos obrigatórios corretamente.');
       return;
     }
 
     const formValue = this.form.value;
 
-    // Preparar dados da transação (sem incluir id, createdAt, updatedAt)
     const transactionData: any = {
       type: formValue.type,
       category: formValue.category,
@@ -319,19 +318,23 @@ export class FinanceFormComponent implements OnInit {
       churchId: 'church-1',
     };
 
-    if (this.isEditMode && this.transactionId) {
-      this.financeService.updateTransaction(this.transactionId, transactionData);
-      console.log('✅ Transação atualizada:', this.transactionId);
-    } else {
-      this.financeService.createTransaction(transactionData);
-      console.log('✅ Transação criada');
-    }
+    try {
+      if (this.isEditMode && this.transactionId) {
+        await this.financeService.updateTransaction(this.transactionId, transactionData);
+        alert('Transação atualizada com sucesso!');
+      } else {
+        await this.financeService.addTransaction(transactionData);
+        alert('Transação criada com sucesso!');
+      }
 
-    // Navegar de volta para listagem
-    this.router.navigate(['/finance']);
+      await this.router.navigate(['/dashboard/financeiro']);
+    } catch (error) {
+      console.error('Erro ao salvar transação:', error);
+      alert(`Erro ao salvar transação: ${error}`);
+    }
   }
 
-  onCancel(): void {
-    this.router.navigate(['/finance']);
+  async onCancel(): Promise<void> {
+    await this.router.navigate(['/dashboard/financeiro']);
   }
 }

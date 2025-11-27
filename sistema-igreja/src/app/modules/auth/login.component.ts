@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { AuthService } from '../../core/services/auth.service';
+import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
 
 @Component({
   selector: 'app-login',
@@ -58,6 +58,11 @@ import { AuthService } from '../../core/services/auth.service';
               </label>
             </div>
 
+            <!-- Mensagem de Erro -->
+            <div *ngIf="errorMessage" class="p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+              {{ errorMessage }}
+            </div>
+
             <!-- Botão Login -->
             <button
               type="submit"
@@ -104,30 +109,37 @@ import { AuthService } from '../../core/services/auth.service';
 export class LoginComponent {
   loginForm: FormGroup;
   isLoading = false;
+  errorMessage = '';
 
   constructor(
     private fb: FormBuilder,
-    private authService: AuthService,
+    private authService: FirebaseAuthService,
     private router: Router
   ) {
     this.loginForm = this.fb.group({
-      email: ['admin@igreja.com', [Validators.required, Validators.email]],
-      password: ['123456', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', Validators.required],
     });
   }
 
   onLogin(): void {
     if (this.loginForm.valid) {
       this.isLoading = true;
+      this.errorMessage = '';
       const { email, password } = this.loginForm.value;
 
-      this.authService.login(email, password).subscribe({
-        next: () => {
+      this.authService.signIn(email, password).subscribe({
+        next: (response) => {
           this.isLoading = false;
-          this.router.navigate(['/dashboard']);
+          if (response.isAuthenticated) {
+            this.router.navigate(['/dashboard']);
+          } else {
+            this.errorMessage = response.error || 'Falha na autenticação';
+          }
         },
         error: (err) => {
           this.isLoading = false;
+          this.errorMessage = 'Erro de conexão com o servidor';
           console.error('Erro ao fazer login:', err);
         },
       });
@@ -136,9 +148,9 @@ export class LoginComponent {
 
   onDemoLogin(): void {
     this.loginForm.patchValue({
-      email: 'admin@igreja.com',
-      password: '123456',
+      email: 'frme@ibn.com',
+      password: 'password123',
     });
-    this.onLogin();
+    // Não executa login automático
   }
 }

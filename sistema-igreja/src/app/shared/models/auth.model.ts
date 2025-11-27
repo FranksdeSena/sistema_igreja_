@@ -3,7 +3,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'pastor' | 'secretaria';
+  role: 'admin' | 'pastor' | 'secretaria' | 'member';
   churchId: string;
   avatar?: string;
   phone?: string;

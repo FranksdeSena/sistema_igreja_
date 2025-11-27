@@ -1,14 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { EventService } from '../../core/services/event.service';
+import { EventsDatabaseService } from '../../core/services/events-database.service';
 import { Event, EventSummary } from '../../shared/models';
+import { Observable, combineLatest } from 'rxjs';
+import { map, startWith, debounceTime } from 'rxjs/operators';
 
 @Component({
   selector: 'app-events',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -29,21 +31,6 @@ import { Event, EventSummary } from '../../shared/models';
         </button>
       </div>
 
-      <!-- Barra de Pesquisa -->
-      <div class="card">
-        <div class="flex flex-col md:flex-row gap-4 items-center">
-          <input
-            type="text"
-            [(ngModel)]="searchQuery"
-            (input)="onSearch()"
-            placeholder="Pesquisar por nome, local ou responsável..."
-            class="input-field flex-1 w-full md:w-auto"
-          />
-          <button (click)="onSearch()" class="btn-primary">🔍 Buscar</button>
-          <button (click)="clearSearch()" class="btn-secondary">Limpar</button>
-        </div>
-      </div>
-
       <!-- Stats Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <!-- Total Eventos -->
@@ -51,7 +38,7 @@ import { Event, EventSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Total Eventos</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-primary-blue break-words">
-              {{ summary.totalEvents }}
+              {{ (summary$ | async)?.totalEvents || 0 }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">📅</span>
           </div>
@@ -62,7 +49,7 @@ import { Event, EventSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Próximos</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-blue-600 break-words">
-              {{ summary.upcomingEvents }}
+              {{ (summary$ | async)?.upcomingEvents || 0 }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">⏳</span>
           </div>
@@ -73,7 +60,7 @@ import { Event, EventSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Concluídos</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-green-600 break-words">
-              {{ summary.completedEvents }}
+              {{ (summary$ | async)?.completedEvents || 0 }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">✅</span>
           </div>
@@ -84,7 +71,7 @@ import { Event, EventSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Registrados</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-primary-blue break-words">
-              {{ summary.totalRegistered }}
+              {{ (summary$ | async)?.totalRegistered || 0 }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">👥</span>
           </div>
@@ -95,7 +82,7 @@ import { Event, EventSummary } from '../../shared/models';
           <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Cap. Média</p>
           <div class="flex items-end justify-between gap-3">
             <p class="text-lg md:text-xl font-bold text-primary-blue break-words">
-              {{ summary.averageCapacity }}
+              {{ (summary$ | async)?.averageCapacity || 0 }}
             </p>
             <span class="flex-shrink-0 text-lg md:text-xl opacity-20">📊</span>
           </div>
@@ -104,20 +91,18 @@ import { Event, EventSummary } from '../../shared/models';
 
       <!-- Filtros -->
       <div class="card">
-        <div class="flex flex-col md:flex-row gap-4">
-          <select
-            [(ngModel)]="selectedCategory"
-            (change)="onCategoryChange()"
-            class="input-field flex-1"
-          >
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <input
+            type="text"
+            [formControl]="searchControl"
+            placeholder="Pesquisar por nome, local ou responsável..."
+            class="input-field"
+          />
+          <select [formControl]="categoryControl" class="input-field">
             <option value="">Todas as Categorias</option>
             <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
           </select>
-          <select
-            [(ngModel)]="selectedStatus"
-            (change)="onStatusChange()"
-            class="input-field flex-1"
-          >
+          <select [formControl]="statusControl" class="input-field">
             <option value="">Todos os Status</option>
             <option value="scheduled">📅 Agendado</option>
             <option value="ongoing">🔴 Em Andamento</option>
@@ -142,7 +127,7 @@ import { Event, EventSummary } from '../../shared/models';
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let event of filteredEvents" class="border-b hover:bg-gray-50">
+            <tr *ngFor="let event of filteredEvents$ | async" class="border-b hover:bg-gray-50">
               <td class="px-4 py-3 text-xs md:text-sm text-gray-900">
                 {{ event.date | date : 'dd/MM/yyyy' }}
               </td>
@@ -184,7 +169,7 @@ import { Event, EventSummary } from '../../shared/models';
 
       <!-- Cards de Eventos (Mobile) -->
       <div class="md:hidden space-y-4">
-        <div *ngFor="let event of filteredEvents" class="card-hover">
+        <div *ngFor="let event of filteredEvents$ | async" class="card-hover">
           <div class="flex justify-between items-start mb-3">
             <div>
               <p class="text-sm font-semibold text-gray-900">{{ event.name }}</p>
@@ -213,7 +198,7 @@ import { Event, EventSummary } from '../../shared/models';
       </div>
 
       <!-- Mensagem vazia -->
-      <div *ngIf="filteredEvents.length === 0" class="card-hover text-center py-12">
+      <div *ngIf="(filteredEvents$ | async)?.length === 0" class="card-hover text-center py-12">
         <p class="text-gray-600 text-lg">📭 Nenhum evento encontrado</p>
         <p class="text-gray-500 text-sm mt-2">Clique em "Novo Evento" para começar</p>
       </div>
@@ -221,90 +206,69 @@ import { Event, EventSummary } from '../../shared/models';
   `,
 })
 export class EventsComponent implements OnInit {
-  events: Event[] = [];
-  filteredEvents: Event[] = [];
-  summary: EventSummary = {
-    totalEvents: 0,
-    upcomingEvents: 0,
-    completedEvents: 0,
-    totalRegistered: 0,
-    averageCapacity: 0,
-  };
+  // Observables
+  summary$: Observable<EventSummary>;
+  filteredEvents$: Observable<Event[]>;
 
-  searchQuery = '';
-  selectedCategory = '';
-  selectedStatus = '';
+  // Form Controls para filtros reativos
+  searchControl = new FormControl('');
+  categoryControl = new FormControl('');
+  statusControl = new FormControl('');
+
   categories: string[] = [];
 
-  constructor(private eventService: EventService) {}
+  constructor(private eventsService: EventsDatabaseService) {
+    // Inicializar summary
+    this.summary$ = this.eventsService.getEventSummary();
 
-  ngOnInit(): void {
-    this.loadEvents();
-    this.loadSummary();
-    this.categories = this.eventService.getCategories();
-  }
+    // Implementar filtros reativos
+    this.filteredEvents$ = combineLatest([
+      this.eventsService.getEvents(),
+      this.searchControl.valueChanges.pipe(startWith(''), debounceTime(300)),
+      this.categoryControl.valueChanges.pipe(startWith('')),
+      this.statusControl.valueChanges.pipe(startWith(''))
+    ]).pipe(
+      map(([events, search, category, status]) => {
+        let filtered = events;
 
-  loadEvents(): void {
-    this.eventService.getEvents().subscribe((events) => {
-      this.events = events;
-      this.applyFilters();
-    });
-  }
+        // Filtro de busca
+        if (search) {
+          const searchLower = search.toLowerCase();
+          filtered = filtered.filter(e =>
+            e.name.toLowerCase().includes(searchLower) ||
+            e.location.toLowerCase().includes(searchLower) ||
+            (e.responsible && e.responsible.toLowerCase().includes(searchLower))
+          );
+        }
 
-  loadSummary(): void {
-    this.eventService.getEventSummary().subscribe((summary) => {
-      this.summary = summary;
-    });
-  }
+        // Filtro de categoria
+        if (category) {
+          filtered = filtered.filter(e => e.category === category);
+        }
 
-  onSearch(): void {
-    this.applyFilters();
-  }
+        // Filtro de status
+        if (status) {
+          filtered = filtered.filter(e => e.status === status);
+        }
 
-  clearSearch(): void {
-    this.searchQuery = '';
-    this.selectedCategory = '';
-    this.selectedStatus = '';
-    this.applyFilters();
-  }
-
-  onCategoryChange(): void {
-    this.applyFilters();
-  }
-
-  onStatusChange(): void {
-    this.applyFilters();
-  }
-
-  applyFilters(): void {
-    let filtered = this.events;
-
-    if (this.searchQuery) {
-      filtered = filtered.filter(
-        (e) =>
-          e.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-          e.location.toLowerCase().includes(this.searchQuery.toLowerCase())
-      );
-    }
-
-    if (this.selectedCategory) {
-      filtered = filtered.filter((e) => e.category === this.selectedCategory);
-    }
-
-    if (this.selectedStatus) {
-      filtered = filtered.filter((e) => e.status === this.selectedStatus);
-    }
-
-    this.filteredEvents = filtered.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        return filtered;
+      })
     );
   }
 
-  onDelete(id: string): void {
+  ngOnInit(): void {
+    this.categories = this.eventsService.getCategories();
+  }
+
+  async onDelete(id: string): Promise<void> {
     if (confirm('Tem certeza que deseja deletar este evento?')) {
-      this.eventService.deleteEvent(id);
-      this.loadEvents();
-      this.loadSummary();
+      try {
+        await this.eventsService.deleteEvent(id);
+        alert('Evento deletado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao deletar evento:', error);
+        alert('Erro ao deletar evento. Tente novamente.');
+      }
     }
   }
 

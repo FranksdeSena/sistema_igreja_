@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Função auxiliar para verificar se o usuário está logado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Função auxiliar para obter os dados do usuário atual
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Função auxiliar para verificar se é admin
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    // Função auxiliar para verificar se é secretaria ou admin
+    function isSecretariaOrAdmin() {
+      let role = getUserData().role;
+      return isAuthenticated() && (role == 'admin' || role == 'secretaria');
+    }
+
+    // Função auxiliar para verificar se é pastor, secretaria ou admin
+    function canManageMembers() {
+      let role = getUserData().role;
+      return isAuthenticated() && (role == 'admin' || role == 'secretaria' || role == 'pastor');
+    }
+
+    // Regras para a coleção de usuários
+    match /users/{userId} {
+      // Qualquer usuário autenticado pode ler dados de usuários
+      allow read: if isAuthenticated();
+      
+      // Apenas admin pode criar, atualizar ou deletar usuários
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Regras para a coleção de membros
+    match /members/{memberId} {
+      // Todos autenticados podem ler
+      allow read: if isAuthenticated();
+      
+      // Admin, Pastor e Secretaria podem criar e atualizar
+      allow create, update: if canManageMembers();
+      
+      // Apenas Admin pode deletar
+      allow delete: if isAdmin();
+    }
+  }
+}
