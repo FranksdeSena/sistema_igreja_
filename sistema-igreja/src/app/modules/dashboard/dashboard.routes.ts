@@ -84,6 +84,10 @@ const DASHBOARD_ROUTES: Routes = [
         path: 'pastor',
         loadChildren: () => import('../pastor/pastor.routes').then(m => m.PASTOR_ROUTES)
       },
+      {
+        path: 'media',
+        loadChildren: () => import('../media/media.routes').then(m => m.MEDIA_ROUTES)
+      },
     ],
   },
 ];

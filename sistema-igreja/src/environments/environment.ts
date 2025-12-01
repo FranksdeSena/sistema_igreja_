@@ -7,5 +7,10 @@ export const environment = {
     storageBucket: "sistema-igreja-68c7a.firebasestorage.app",
     messagingSenderId: "632507991502",
     appId: "1:632507991502:web:89773e4fd966d78ca3579f"
+  },
+  cloudinary: {
+    cloudName: 'dz0z0uet5',
+    apiKey: '739258495331664',
+    uploadPreset: 'igreja_uploads' // Vamos criar isso no Cloudinary
   }
 };

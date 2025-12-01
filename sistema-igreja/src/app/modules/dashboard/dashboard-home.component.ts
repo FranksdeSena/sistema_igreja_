@@ -225,23 +225,23 @@ import { map } from 'rxjs/operators';
               </div>
             </div>
 
-            <!-- Actions -->
+            <!-- Actions (Sempre visíveis) -->
             <div
-              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1"
+              class="absolute top-2 right-2 flex gap-2 z-10"
             >
               <button
-                (click)="onLikeMedia(item.id)"
-                class="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full text-sm"
+                (click)="onLikeMedia(item.id, $event)"
+                class="bg-white/90 hover:bg-white text-red-500 hover:scale-110 transition-all p-2 rounded-full shadow-lg backdrop-blur-sm opacity-100"
                 title="Curtir"
               >
-                ❤️
+                <span class="text-lg">❤️</span>
               </button>
               <button
-                (click)="onDeleteMedia(item.id)"
-                class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full text-sm"
+                (click)="onDeleteMedia(item.id, $event)"
+                class="bg-white/90 hover:bg-white text-red-600 hover:scale-110 transition-all p-2 rounded-full shadow-lg backdrop-blur-sm opacity-100"
                 title="Deletar"
               >
-                🗑️
+                <span class="text-lg">🗑️</span>
               </button>
             </div>
           </div>
@@ -425,12 +425,33 @@ export class DashboardHomeComponent implements OnInit {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 
-  onLikeMedia(id: string): void {
-    this.mediaService.likeMedia(id);
-    this.loadDashboardData();
+  async onLikeMedia(mediaId: string, event?: Event): Promise<void> {
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    try {
+      // Feedback otimista
+      const media = this.mediaGallery.find(m => m.id === mediaId);
+      if (media) {
+        media.likes = (media.likes || 0) + 1;
+      }
+
+      await this.mediaService.likeMedia(mediaId);
+    } catch (error) {
+      console.error('Erro ao curtir mídia:', error);
+      // Reverter
+      const media = this.mediaGallery.find(m => m.id === mediaId);
+      if (media && media.likes) {
+        media.likes--;
+      }
+    }
   }
 
-  onDeleteMedia(id: string): void {
+  onDeleteMedia(id: string, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
     if (confirm('Tem certeza que deseja deletar essa mídia?')) {
       this.mediaService.deleteMedia(id);
       this.loadDashboardData();

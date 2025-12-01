@@ -15,27 +15,22 @@ import {
   DocumentData,
   onSnapshot,
   Timestamp,
-  limit
+  limit,
+  increment
 } from '@angular/fire/firestore';
-import {
-  Storage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject
-} from '@angular/fire/storage';
 import { Observable, from, of, firstValueFrom } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { MediaItem } from '../../shared/models';
 import { AuditService } from './audit.service';
 import { FirebaseAuthService } from './firebase-auth.service';
+import { CloudinaryService } from './cloudinary.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class MediaDatabaseService {
   private firestore: Firestore = inject(Firestore);
-  private storage: Storage = inject(Storage);
+  private cloudinaryService = inject(CloudinaryService);
   private auditService = inject(AuditService);
   private authService = inject(FirebaseAuthService);
   private mediaCollection: CollectionReference<DocumentData>;
@@ -48,46 +43,43 @@ export class MediaDatabaseService {
   }
 
   /**
-   * Faz upload de arquivo para Firebase Storage e salva metadados no Firestore
+   * Faz upload de arquivo para Cloudinary e salva metadados no Firestore
    */
   async uploadMedia(
     file: File,
     metadata: Omit<MediaItem, 'id' | 'mediaUrl' | 'thumbnailUrl' | 'createdAt' | 'updatedAt' | 'fileSize'>
   ): Promise<string> {
     try {
-      // 1. Upload do arquivo para Storage
-      const timestamp = Date.now();
-      const fileName = `${timestamp}_${file.name}`;
-      const storageRef = ref(this.storage, `media/${fileName}`);
-      
-      const uploadResult = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(uploadResult.ref);
+      // 1. Upload do arquivo para Cloudinary
+      const cloudinaryResult = await this.cloudinaryService.uploadFile(file);
 
-      // 2. Gerar thumbnail se for imagem ou vídeo
-      let thumbnailURL: string | undefined;
-      if (metadata.type === 'photo' || metadata.type === 'video') {
-        const thumbnailFile = await this.generateThumbnailFile(file, metadata.type);
-        if (thumbnailFile) {
-          const thumbnailRef = ref(this.storage, `media/thumbnails/${timestamp}_thumb_${file.name}`);
-          const thumbResult = await uploadBytes(thumbnailRef, thumbnailFile);
-          thumbnailURL = await getDownloadURL(thumbResult.ref);
-        }
-      }
-
-      // 3. Calcular data de expiração (30 dias a partir de agora)
+      // 2. Calcular data de expiração (30 dias a partir de agora)
       const now = new Date();
       const expiresAt = new Date(now.getTime() + this.RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
+      // 3. Calcular duração para vídeos
+      let duration: number | undefined;
+      if (metadata.type === 'video' && cloudinaryResult.duration) {
+        duration = Math.round(cloudinaryResult.duration);
+      }
+
       // 4. Salvar metadados no Firestore
-      const mediaData = {
+      // 4. Preparar dados para o Firestore (removendo undefined)
+      const mediaData: any = {
         ...metadata,
-        mediaUrl: downloadURL,
-        thumbnailUrl: thumbnailURL,
-        fileSize: file.size,
+        mediaUrl: cloudinaryResult.secure_url,
+        thumbnailUrl: cloudinaryResult.thumbnail_url || cloudinaryResult.secure_url, // Fallback para imagem
+        fileSize: cloudinaryResult.bytes,
+        cloudinaryPublicId: cloudinaryResult.public_id,
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
         expiresAt: Timestamp.fromDate(expiresAt)
       };
+
+      // Adicionar duração apenas se existir (Firestore não aceita undefined)
+      if (duration) {
+        mediaData.duration = duration;
+      }
 
       const docRef = await addDoc(this.mediaCollection, mediaData);
 
@@ -221,11 +213,33 @@ export class MediaDatabaseService {
   }
 
   /**
-   * Deleta mídia (arquivo do Storage + documento do Firestore)
+   * Incrementa curtidas de uma mídia
+   */
+  async likeMedia(id: string): Promise<void> {
+    const docRef = doc(this.firestore, 'media', id);
+    await updateDoc(docRef, {
+      likes: increment(1),
+      updatedAt: Timestamp.now()
+    });
+  }
+
+  /**
+   * Incrementa visualizações de uma mídia
+   */
+  async incrementViews(id: string): Promise<void> {
+    const docRef = doc(this.firestore, 'media', id);
+    await updateDoc(docRef, {
+      views: increment(1)
+    });
+  }
+
+  /**
+   * Deleta mídia do Firestore
+   * Nota: Arquivos do Cloudinary ficam lá (deletar requer backend)
    */
   async deleteMedia(id: string): Promise<void> {
     try {
-      // 1. Buscar dados da mídia
+      // Buscar dados da mídia
       const mediaDoc = await getDoc(doc(this.firestore, 'media', id));
       if (!mediaDoc.exists()) {
         throw new Error('Mídia não encontrada');
@@ -233,27 +247,7 @@ export class MediaDatabaseService {
 
       const mediaData = mediaDoc.data() as MediaItem;
 
-      // 2. Deletar arquivo do Storage
-      if (mediaData.mediaUrl) {
-        try {
-          const fileRef = ref(this.storage, mediaData.mediaUrl);
-          await deleteObject(fileRef);
-        } catch (error) {
-          console.warn('Erro ao deletar arquivo do Storage:', error);
-        }
-      }
-
-      // 3. Deletar thumbnail do Storage
-      if (mediaData.thumbnailUrl) {
-        try {
-          const thumbRef = ref(this.storage, mediaData.thumbnailUrl);
-          await deleteObject(thumbRef);
-        } catch (error) {
-          console.warn('Erro ao deletar thumbnail do Storage:', error);
-        }
-      }
-
-      // 4. Deletar documento do Firestore
+      // Deletar documento do Firestore
       await deleteDoc(doc(this.firestore, 'media', id));
 
       this.logAuditAction('DELETE', id, mediaData.title, `Mídia deletada: ${mediaData.title}`);
@@ -308,72 +302,6 @@ export class MediaDatabaseService {
     }, intervalMs);
 
     console.log(`Limpeza automática agendada a cada ${intervalDays} dias`);
-  }
-
-  /**
-   * Gera arquivo de thumbnail a partir de imagem ou vídeo
-   */
-  private async generateThumbnailFile(file: File, type: string): Promise<File | null> {
-    return new Promise((resolve) => {
-      if (type === 'photo') {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_SIZE = 300;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_SIZE) {
-              height *= MAX_SIZE / width;
-              width = MAX_SIZE;
-            }
-          } else {
-            if (height > MAX_SIZE) {
-              width *= MAX_SIZE / height;
-              height = MAX_SIZE;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(new File([blob], `thumb_${file.name}`, { type: 'image/jpeg' }));
-            } else {
-              resolve(null);
-            }
-          }, 'image/jpeg', 0.7);
-        };
-        img.src = URL.createObjectURL(file);
-      } else if (type === 'video') {
-        const video = document.createElement('video');
-        video.onloadeddata = () => {
-          video.currentTime = 1; // Captura frame em 1 segundo
-        };
-        video.onseeked = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 300;
-          canvas.height = (video.videoHeight / video.videoWidth) * 300;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(new File([blob], `thumb_${file.name}`, { type: 'image/jpeg' }));
-            } else {
-              resolve(null);
-            }
-          }, 'image/jpeg', 0.7);
-        };
-        video.src = URL.createObjectURL(file);
-      } else {
-        resolve(null);
-      }
-    });
   }
 
   /**

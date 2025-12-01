@@ -94,7 +94,7 @@ import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
           </a>
 
           <a
-            routerLink="/dashboard/midia"
+            routerLink="/dashboard/media"
             routerLinkActive="bg-blue-50 text-primary-blue"
             class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
           >
