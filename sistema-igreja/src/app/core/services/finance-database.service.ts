@@ -15,15 +15,19 @@ import {
   DocumentData,
   onSnapshot
 } from '@angular/fire/firestore';
-import { Observable, from, of, combineLatest } from 'rxjs';
+import { Observable, from, of, combineLatest, firstValueFrom } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Transaction, FinancialSummary } from '../../shared/models';
+import { AuditService } from './audit.service';
+import { FirebaseAuthService } from './firebase-auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class FinanceDatabaseService {
   private firestore: Firestore = inject(Firestore);
+  private auditService = inject(AuditService);
+  private authService = inject(FirebaseAuthService);
   private transactionsCollection: CollectionReference<DocumentData>;
 
   constructor() {
@@ -38,6 +42,15 @@ export class FinanceDatabaseService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+    
+    // Log de auditoria (executa em background)
+    this.logAuditAction(
+      'CREATE',
+      docRef.id,
+      `${transaction.type === 'income' ? 'Receita' : 'Despesa'}: ${transaction.category}`,
+      `Nova transação: ${transaction.category} - R$ ${transaction.amount.toFixed(2)}`
+    );
+    
     return docRef.id;
   }
 
@@ -100,6 +113,9 @@ export class FinanceDatabaseService {
   // Atualizar Transação
   async updateTransaction(id: string, transaction: Partial<Transaction>): Promise<void> {
     const docRef = doc(this.firestore, 'transactions', id);
+    const beforeDoc = await getDoc(docRef);
+    const beforeData = beforeDoc.exists() ? beforeDoc.data() : null;
+    
     const updateData: any = {
       ...transaction,
       updatedAt: new Date().toISOString()
@@ -114,12 +130,58 @@ export class FinanceDatabaseService {
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     
     await updateDoc(docRef, updateData);
+    
+    // Log de auditoria (executa em background)
+    if (beforeData) {
+      this.logAuditAction(
+        'UPDATE',
+        id,
+        beforeData['category'],
+        `Transação atualizada: ${beforeData['category']}`
+      );
+    }
   }
 
   // Excluir Transação
   async deleteTransaction(id: string): Promise<void> {
     const docRef = doc(this.firestore, 'transactions', id);
+    const beforeDoc = await getDoc(docRef);
+    const beforeData = beforeDoc.exists() ? beforeDoc.data() : null;
+    
     await deleteDoc(docRef);
+    
+    // Log de auditoria (executa em background)
+    if (beforeData) {
+      this.logAuditAction(
+        'DELETE',
+        id,
+        `${beforeData['category']} - R$ ${beforeData['amount']}`,
+        `Transação excluída: ${beforeData['category']} - R$ ${beforeData['amount']}`
+      );
+    }
+  }
+
+  // Método auxiliar para registrar auditoria de forma assíncrona
+  private logAuditAction(action: 'CREATE' | 'UPDATE' | 'DELETE', entityId: string, entityName: string, description: string): void {
+    // Executa de forma assíncrona sem bloquear
+    firstValueFrom(this.authService.currentUser$)
+      .then(currentUser => {
+        if (currentUser) {
+          this.auditService.logAction({
+            userId: currentUser.id,
+            userName: currentUser.full_name,
+            userEmail: currentUser.email,
+            action,
+            module: 'finance',
+            entityId,
+            entityName,
+            description
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao registrar log de auditoria:', error);
+      });
   }
 
   // Buscar transações por tipo

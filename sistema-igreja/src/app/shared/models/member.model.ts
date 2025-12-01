@@ -20,18 +20,4 @@ export interface Member {
   updatedAt: Date;
 }
 
-// Célula (pequeno grupo)
-export interface Cell {
-  id: string;
-  churchId: string;
-  name: string;
-  description?: string;
-  leaderIds: string[];
-  memberIds: string[];
-  meetingDay: string;
-  meetingTime: string;
-  location?: string;
-  status: 'active' | 'inactive';
-  createdAt: Date;
-  updatedAt: Date;
-}
+

@@ -15,15 +15,19 @@ import {
   DocumentData,
   onSnapshot
 } from '@angular/fire/firestore';
-import { Observable, from, of } from 'rxjs';
+import { Observable, from, of, firstValueFrom } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Member } from '../../shared/models';
+import { AuditService } from './audit.service';
+import { FirebaseAuthService } from './firebase-auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class MembersDatabaseService {
   private firestore: Firestore = inject(Firestore);
+  private auditService = inject(AuditService);
+  private authService = inject(FirebaseAuthService);
   private membersCollection: CollectionReference<DocumentData>;
 
   constructor() {
@@ -37,7 +41,34 @@ export class MembersDatabaseService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+    
+    // Log de auditoria (executa em background, não bloqueia a operação)
+    this.logAuditAction('CREATE', docRef.id, member.name, `Novo membro cadastrado: ${member.name}`);
+    
     return docRef.id;
+  }
+
+  // Método auxiliar para registrar auditoria de forma assíncrona
+  private logAuditAction(action: 'CREATE' | 'UPDATE' | 'DELETE', entityId: string, entityName: string, description: string): void {
+    // Executa de forma assíncrona sem bloquear
+    firstValueFrom(this.authService.currentUser$)
+      .then(currentUser => {
+        if (currentUser) {
+          this.auditService.logAction({
+            userId: currentUser.id,
+            userName: currentUser.full_name,
+            userEmail: currentUser.email,
+            action,
+            module: 'members',
+            entityId,
+            entityName,
+            description
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao registrar log de auditoria:', error);
+      });
   }
 
   // Listar Membros em TEMPO REAL (usando onSnapshot)
@@ -51,10 +82,10 @@ export class MembersDatabaseService {
             return {
               id: doc.id,
               ...data,
-              birthDate: data['birthDate'] ? new Date(data['birthDate']) : undefined,
-              joinDate: data['joinDate'] ? new Date(data['joinDate']) : new Date(),
-              createdAt: data['createdAt'] ? new Date(data['createdAt']) : new Date(),
-              updatedAt: data['updatedAt'] ? new Date(data['updatedAt']) : new Date()
+              birthDate: this.parseDate(data['birthDate']),
+              joinDate: this.parseDate(data['joinDate']) || new Date(),
+              createdAt: this.parseDate(data['createdAt']) || new Date(),
+              updatedAt: this.parseDate(data['updatedAt']) || new Date()
             } as Member;
           });
           
@@ -125,10 +156,10 @@ export class MembersDatabaseService {
           return {
             id: docSnap.id,
             ...data,
-            birthDate: data['birthDate'] ? new Date(data['birthDate']) : undefined,
-            joinDate: data['joinDate'] ? new Date(data['joinDate']) : new Date(),
-            createdAt: data['createdAt'] ? new Date(data['createdAt']) : new Date(),
-            updatedAt: data['updatedAt'] ? new Date(data['updatedAt']) : new Date()
+            birthDate: this.parseDate(data['birthDate']),
+            joinDate: this.parseDate(data['joinDate']) || new Date(),
+            createdAt: this.parseDate(data['createdAt']) || new Date(),
+            updatedAt: this.parseDate(data['updatedAt']) || new Date()
           } as Member;
         }
         return undefined;
@@ -136,9 +167,31 @@ export class MembersDatabaseService {
     );
   }
 
+  // Helper para converter datas do Firestore (Timestamp, String ou Date)
+  private parseDate(value: any): Date | undefined {
+    if (!value) return undefined;
+    
+    // Se for Timestamp do Firestore
+    if (value && typeof value.toDate === 'function') {
+      return value.toDate();
+    }
+    
+    // Se for string ou number
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+    
+    return undefined;
+  }
+
   // Atualizar Membro
   async updateMember(id: string, member: Partial<Member>): Promise<void> {
+    // Buscar dados anteriores para o log
     const docRef = doc(this.firestore, 'members', id);
+    const beforeDoc = await getDoc(docRef);
+    const beforeData = beforeDoc.exists() ? beforeDoc.data() : null;
+    
     const updateData = {
       ...member,
       updatedAt: new Date().toISOString()
@@ -147,12 +200,26 @@ export class MembersDatabaseService {
     Object.keys(updateData).forEach(key => updateData[key as keyof typeof updateData] === undefined && delete updateData[key as keyof typeof updateData]);
     
     await updateDoc(docRef, updateData);
+    
+    // Log de auditoria (executa em background)
+    if (beforeData) {
+      this.logAuditAction('UPDATE', id, member.name || beforeData['name'], `Membro atualizado: ${member.name || beforeData['name']}`);
+    }
   }
 
   // Excluir Membro
   async deleteMember(id: string): Promise<void> {
+    // Buscar dados antes de excluir para o log
     const docRef = doc(this.firestore, 'members', id);
+    const beforeDoc = await getDoc(docRef);
+    const beforeData = beforeDoc.exists() ? beforeDoc.data() : null;
+    
     await deleteDoc(docRef);
+    
+    // Log de auditoria (executa em background)
+    if (beforeData) {
+      this.logAuditAction('DELETE', id, beforeData['name'], `Membro excluído: ${beforeData['name']}`);
+    }
   }
 
   // Buscar Membros (filtro simples local por enquanto, idealmente seria no banco)
@@ -163,5 +230,42 @@ export class MembersDatabaseService {
         m.email.toLowerCase().includes(term.toLowerCase())
       ))
     );
+  }
+  // Buscar aniversariantes do mês
+  getBirthdaysThisMonth(): Observable<Member[]> {
+    return this.getMembers().pipe(
+      map(members => {
+        const now = new Date();
+        const currentMonth = now.getMonth(); // 0-11
+        
+        return members
+          .filter(member => {
+            if (!member.birthDate) return false;
+            
+            // Converter para Date
+            const birthDate = new Date(member.birthDate);
+            
+            // Usar UTC para evitar problemas de fuso horário
+            const isoString = birthDate.toISOString();
+            const month = parseInt(isoString.substring(5, 7)) - 1; // 0-indexed
+            
+            return month === currentMonth;
+          })
+          .sort((a, b) => {
+            const dateA = new Date(a.birthDate!);
+            const dateB = new Date(b.birthDate!);
+            return dateA.getUTCDate() - dateB.getUTCDate();
+          });
+      })
+    );
+  }
+
+  // MÉTODO DE CORREÇÃO: Corrigir data corrompida de membro específico
+  async fixCorruptedBirthDate(memberId: string, correctDate: Date): Promise<void> {
+    const memberDoc = doc(this.firestore, 'members', memberId);
+    await updateDoc(memberDoc, {
+      birthDate: correctDate.toISOString(),
+      updatedAt: new Date().toISOString()
+    });
   }
 }

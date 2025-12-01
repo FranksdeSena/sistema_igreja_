@@ -70,7 +70,7 @@ import { map, startWith, debounceTime } from 'rxjs/operators';
                     </div>
                     <div class="ml-4">
                       <div class="text-sm font-medium text-gray-900">{{ member.name }}</div>
-                      <div class="text-xs text-gray-500">Desde {{ member.joinDate | date:'MM/yyyy' }}</div>
+                      <div class="text-xs text-gray-500">Desde {{ formatDate(member.joinDate) }}</div>
                     </div>
                   </div>
                 </td>
@@ -187,6 +187,26 @@ export class MembersComponent implements OnInit {
         console.error('Erro ao excluir membro:', error);
         alert('Erro ao excluir membro. Tente novamente.');
       });
+    }
+  }
+
+  formatDate(dateValue: any, format: string = 'MM/yyyy'): string {
+    if (!dateValue) return '-';
+    
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return '-';
+    
+    try {
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      if (format === 'MM/yyyy') {
+        return `${month}/${year}`;
+      }
+      
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return '-';
     }
   }
 }

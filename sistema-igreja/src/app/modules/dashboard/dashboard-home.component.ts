@@ -1,19 +1,21 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { PastorService } from '../../core/services/pastor.service';
+import { PastorDatabaseService } from '../../core/services/pastor-database.service';
 import { MediaService } from '../../core/services/media.service';
 import { MembersDatabaseService } from '../../core/services/members-database.service';
 import { FinanceDatabaseService } from '../../core/services/finance-database.service';
 import { EventsDatabaseService } from '../../core/services/events-database.service';
-import { PastorDailyMessage, Sermon, MediaItem } from '../../shared/models';
+import { Sermon, MediaItem, Member, Event as EventModel } from '../../shared/models';
 import { MediaViewerComponent } from '../../shared/components/media-viewer.component';
+import { PastorWordWidgetComponent } from './components/pastor-word-widget/pastor-word-widget.component';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-dashboard-home',
   standalone: true,
-  imports: [CommonModule, RouterModule, MediaViewerComponent],
+  imports: [CommonModule, RouterModule, MediaViewerComponent, PastorWordWidgetComponent],
   template: `
     <div class="space-y-8">
       <!-- Título da Página -->
@@ -86,37 +88,8 @@ import { Observable } from 'rxjs';
       <!-- Seção de Conteúdo Principal -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Palavra do Pastor -->
-        <div class="lg:col-span-2 card">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <span class="text-2xl">📖</span>
-              <h3 class="text-2xl font-bold text-gray-900">Palavra do Pastor</h3>
-            </div>
-            <a routerLink="/pastor" class="text-sm text-primary-blue hover:text-blue-700"
-              >Ver todas →</a
-            >
-          </div>
-          <div class="space-y-4" *ngIf="latestDailyMessage">
-            <div class="bg-gradient-to-r from-primary-blue to-blue-600 text-white rounded-xl p-6">
-              <h4 class="text-xl font-bold mb-2">{{ latestDailyMessage.title }}</h4>
-              <p class="text-blue-100 mb-4">{{ latestDailyMessage.message }}</p>
-              <div class="flex gap-2 flex-wrap">
-                <span *ngIf="latestDailyMessage.biblicalText" class="badge badge-warning">{{
-                  latestDailyMessage.biblicalText
-                }}</span>
-                <span *ngFor="let tag of latestDailyMessage.tags" class="badge badge-warning">{{
-                  tag
-                }}</span>
-              </div>
-              <p class="text-xs text-blue-200 mt-4">
-                - {{ latestDailyMessage.pastor }} •
-                {{ latestDailyMessage.date | date : 'dd/MM/yyyy' }}
-              </p>
-            </div>
-          </div>
-          <div *ngIf="!latestDailyMessage" class="text-center py-8 text-gray-500">
-            <p>Nenhuma palavra do pastor publicada no momento</p>
-          </div>
+        <div class="lg:col-span-2">
+          <app-pastor-word-widget></app-pastor-word-widget>
         </div>
 
         <!-- Aniversariantes do Mês -->
@@ -127,31 +100,20 @@ import { Observable } from 'rxjs';
           </div>
           <div class="space-y-3">
             <div
+              *ngFor="let member of birthdays$ | async"
               class="flex items-center justify-between p-3 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors"
             >
               <div>
-                <p class="font-medium text-gray-900">Maria Silva</p>
-                <p class="text-sm text-gray-600">16/11/1990</p>
+                <p class="font-medium text-gray-900">{{ member.name }}</p>
+                <p class="text-sm text-gray-600">{{ member.birthDate | date:'dd/MM/yyyy':'UTC' }}</p>
               </div>
               <span>🎈</span>
             </div>
             <div
-              class="flex items-center justify-between p-3 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors"
+              *ngIf="(birthdays$ | async)?.length === 0"
+              class="text-center py-8 text-gray-500"
             >
-              <div>
-                <p class="font-medium text-gray-900">João Santos</p>
-                <p class="text-sm text-gray-600">18/11/1985</p>
-              </div>
-              <span>🎈</span>
-            </div>
-            <div
-              class="flex items-center justify-between p-3 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <div>
-                <p class="font-medium text-gray-900">Ana Costa</p>
-                <p class="text-sm text-gray-600">21/11/1988</p>
-              </div>
-              <span>🎈</span>
+              <p>Nenhum aniversariante este mês</p>
             </div>
           </div>
         </div>
@@ -164,7 +126,7 @@ import { Observable } from 'rxjs';
             <span class="text-2xl">🎤</span>
             <h3 class="text-2xl font-bold text-gray-900">Sermões Recentes</h3>
           </div>
-          <a routerLink="/pastor" class="text-sm text-primary-blue hover:text-blue-700"
+          <a routerLink="/dashboard/pastor" class="text-sm text-primary-blue hover:text-blue-700"
             >Ver todos →</a
           >
         </div>
@@ -176,12 +138,11 @@ import { Observable } from 'rxjs';
             <div class="flex-1">
               <p class="font-bold text-gray-900">{{ sermon.title }}</p>
               <p class="text-sm text-gray-600 mt-1">
-                {{ sermon.biblicalText }} • {{ sermon.pastor }}
+                {{ sermon.scriptureReference }} • {{ sermon.preacher }}
               </p>
               <div class="flex gap-2 mt-2 flex-wrap">
                 <span class="badge text-xs">📅 {{ sermon.date | date : 'dd/MM/yyyy' }}</span>
-                <span class="badge text-xs">⏱️ {{ sermon.duration }}min</span>
-                <span class="badge text-xs">👥 {{ sermon.attendance }} pessoas</span>
+                <span class="badge text-xs" *ngIf="sermon.series">📚 {{ sermon.series }}</span>
               </div>
             </div>
           </div>
@@ -295,37 +256,46 @@ import { Observable } from 'rxjs';
 
       <!-- Eventos Próximos -->
       <div class="card">
-        <div class="flex items-center gap-2 mb-4">
-          <span class="text-2xl">📅</span>
-          <h3 class="text-2xl font-bold text-gray-900">Próximos Eventos</h3>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">📅</span>
+            <h3 class="text-2xl font-bold text-gray-900">Próximos Eventos</h3>
+          </div>
+          <a routerLink="/dashboard/eventos" class="text-sm text-primary-blue hover:text-blue-700">
+            Ver todos →
+          </a>
         </div>
-        <div class="space-y-3">
+        <div class="space-y-3" *ngIf="upcomingEventsList$ | async as events">
           <div
-            class="flex items-center justify-between p-4 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors"
+            *ngFor="let event of events"
+            class="flex items-center justify-between p-4 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+            [routerLink]="['/dashboard/eventos']"
           >
-            <div>
-              <p class="font-bold text-gray-900">Batismo de Novos Membros</p>
-              <p class="text-sm text-gray-600">28 de Novembro • 14:00</p>
+            <div class="flex-1">
+              <p class="font-bold text-gray-900">{{ event.name }}</p>
+              <p class="text-sm text-gray-600">
+                {{ event.date | date:'dd/MM/yyyy' }} • {{ event.time }}
+              </p>
+              <p class="text-xs text-gray-500 mt-1" *ngIf="event.location">
+                📍 {{ event.location }}
+              </p>
             </div>
-            <span class="badge badge-primary">Confira</span>
+            <span 
+              class="badge text-xs"
+              [ngClass]="{
+                'badge-primary': event.status === 'scheduled',
+                'bg-green-100 text-green-800': event.status === 'completed',
+                'bg-red-100 text-red-800': event.status === 'cancelled'
+              }"
+            >
+              {{ event.status === 'scheduled' ? 'Agendado' : event.status === 'completed' ? 'Realizado' : 'Cancelado' }}
+            </span>
           </div>
-          <div
-            class="flex items-center justify-between p-4 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <div>
-              <p class="font-bold text-gray-900">Reunião de Células</p>
-              <p class="text-sm text-gray-600">30 de Novembro • 19:00</p>
-            </div>
-            <span class="badge badge-primary">Confira</span>
-          </div>
-          <div
-            class="flex items-center justify-between p-4 bg-background-gray rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <div>
-              <p class="font-bold text-gray-900">Conferência Anual</p>
-              <p class="text-sm text-gray-600">05 de Dezembro • 09:00</p>
-            </div>
-            <span class="badge badge-primary">Confira</span>
+          <div *ngIf="events.length === 0" class="text-center py-8 text-gray-500">
+            <p>Nenhum evento próximo agendado</p>
+            <a routerLink="/dashboard/eventos/novo" class="text-sm text-primary-blue hover:text-blue-700 mt-2 inline-block">
+              Criar novo evento →
+            </a>
           </div>
         </div>
       </div>
@@ -334,7 +304,6 @@ import { Observable } from 'rxjs';
   styles: [],
 })
 export class DashboardHomeComponent implements OnInit {
-  latestDailyMessage: PastorDailyMessage | undefined;
   recentSermons: Sermon[] = [];
   mediaGallery: MediaItem[] = [];
   isUploadingFile = false;
@@ -349,9 +318,11 @@ export class DashboardHomeComponent implements OnInit {
   totalIncome$: Observable<number>;
   totalExpense$: Observable<number>;
   upcomingEvents$: Observable<number>;
+  upcomingEventsList$: Observable<EventModel[]>;
+  birthdays$: Observable<Member[]>;
 
   constructor(
-    private pastorService: PastorService,
+    private pastorService: PastorDatabaseService,
     private mediaService: MediaService,
     private membersService: MembersDatabaseService,
     private financeService: FinanceDatabaseService,
@@ -362,6 +333,18 @@ export class DashboardHomeComponent implements OnInit {
     this.totalIncome$ = this.financeService.getTotalIncome();
     this.totalExpense$ = this.financeService.getTotalExpense();
     this.upcomingEvents$ = this.eventsService.getUpcomingEventsCount();
+    this.birthdays$ = this.membersService.getBirthdaysThisMonth();
+    
+    // Buscar próximos 3 eventos
+    this.upcomingEventsList$ = this.eventsService.getEvents().pipe(
+      map((events: EventModel[]) => {
+        const now = new Date();
+        return events
+          .filter((event: EventModel) => event.status === 'scheduled' && new Date(event.date) >= now)
+          .sort((a: EventModel, b: EventModel) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 3);
+      })
+    );
   }
 
   ngOnInit(): void {
@@ -369,19 +352,14 @@ export class DashboardHomeComponent implements OnInit {
   }
 
   private loadDashboardData(): void {
-    // Carrega a última mensagem do pastor
-    this.pastorService.getLatestDailyMessage().subscribe((message) => {
-      this.latestDailyMessage = message;
-    });
-
     // Carrega os últimos 5 sermões
     this.pastorService.getRecentSermons(5).subscribe((sermons) => {
       this.recentSermons = sermons;
     });
 
-    // Carrega mídias publicadas
+    // Carrega mídias publicadas (últimas 8)
     this.mediaService.getPublishedMedia().subscribe((items) => {
-      this.mediaGallery = items.slice(0, 8); // Limita a 8 itens no mural
+      this.mediaGallery = items.slice(0, 8);
     });
   }
 
@@ -401,35 +379,18 @@ export class DashboardHomeComponent implements OnInit {
           continue;
         }
 
-        const mediaUrl = await this.mediaService.convertFileToBase64(file);
-        let thumbnailUrl: string | undefined;
-        let duration: number | undefined;
-
-        // Gera miniatura e duração para vídeos
-        if (type === 'video') {
-          thumbnailUrl = await this.mediaService.generateThumbnail(file, type);
-          duration = await this.mediaService.getVideoDuration(file);
-        } else if (type === 'photo') {
-          thumbnailUrl = await this.mediaService.generateThumbnail(file, type);
-        }
-
-        // Cria o item de mídia
-        const mediaItem: Omit<MediaItem, 'id' | 'createdAt' | 'updatedAt'> = {
+        // Usar novo método de upload com Firebase Storage
+        await this.mediaService.uploadMediaWithFile(file, {
           churchId: 'church-1',
           title: file.name.replace(/\.[^/.]+$/, ''), // Remove extensão
           description: '',
           type,
-          mediaUrl,
-          thumbnailUrl,
-          fileSize: file.size,
-          duration,
           uploadedBy: 'Membro',
           status: 'published',
           tags: [type],
-        };
+        });
 
-        this.mediaService.uploadMedia(mediaItem);
-        this.loadDashboardData();
+        console.log(`Upload concluído: ${file.name}`);
       } catch (error) {
         console.error('Erro ao fazer upload:', error);
         alert(`Erro ao fazer upload de ${file.name}`);

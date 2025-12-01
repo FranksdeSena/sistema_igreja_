@@ -231,10 +231,10 @@ export class PastorService {
         this.visitsObservable$.subscribe((visits) => {
           const completedVisits = visits.filter((v) => v.status === 'completed').length;
           const pendingVisits = visits.filter((v) => v.status === 'scheduled').length;
-          const totalAttendance = sermons.reduce((sum, s) => sum + s.attendance, 0);
+          const totalAttendance = sermons.reduce((sum, s) => sum + (s.attendance || 0), 0);
           const averageDuration =
             sermons.length > 0
-              ? Math.round(sermons.reduce((sum, s) => sum + s.duration, 0) / sermons.length)
+              ? Math.round(sermons.reduce((sum, s) => sum + (s.duration || 0), 0) / sermons.length)
               : 0;
 
           observer.next({
@@ -267,8 +267,8 @@ export class PastorService {
         const filtered = sermons.filter(
           (s) =>
             s.title.toLowerCase().includes(query.toLowerCase()) ||
-            s.pastor.toLowerCase().includes(query.toLowerCase()) ||
-            s.biblicalText.toLowerCase().includes(query.toLowerCase())
+            (s.pastor?.toLowerCase() || '').includes(query.toLowerCase()) ||
+            (s.biblicalText?.toLowerCase() || '').includes(query.toLowerCase())
         );
         observer.next(filtered);
       });

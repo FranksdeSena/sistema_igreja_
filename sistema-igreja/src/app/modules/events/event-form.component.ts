@@ -34,7 +34,7 @@ import { Subscription } from 'rxjs';
                 <input
                   type="text"
                   formControlName="name"
-                  placeholder="Ex: Culto Dominical, Reunião de Diáconos..."
+                  placeholder="Ex: Culto Dominical, Reunião de Oração..."
                   class="input-field"
                 />
                 <span
@@ -60,20 +60,13 @@ import { Subscription } from 'rxjs';
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select formControlName="status" class="input-field">
-                  <option value="">Selecione o status...</option>
                   <option value="scheduled">📅 Agendado</option>
                   <option value="ongoing">🔴 Em Andamento</option>
                   <option value="completed">✅ Concluído</option>
                   <option value="cancelled">❌ Cancelado</option>
                 </select>
-                <span
-                  *ngIf="form.get('status')?.invalid && form.get('status')?.touched"
-                  class="text-sm text-red-600"
-                >
-                  Status é obrigatório
-                </span>
               </div>
             </div>
           </div>
@@ -94,72 +87,24 @@ import { Subscription } from 'rxjs';
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Horário *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Horário</label>
                 <input type="time" formControlName="time" class="input-field" />
-                <span
-                  *ngIf="form.get('time')?.invalid && form.get('time')?.touched"
-                  class="text-sm text-red-600"
-                >
-                  Horário é obrigatório
-                </span>
               </div>
             </div>
           </div>
 
-          <!-- Local e Capacidade -->
+          <!-- Local -->
           <div class="border-b pb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Local e Participantes</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Local</h3>
+            <div class="grid grid-cols-1 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Local *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Local</label>
                 <input
                   type="text"
                   formControlName="location"
                   placeholder="Ex: Templo Principal, Sala de Reuniões..."
                   class="input-field"
                 />
-                <span
-                  *ngIf="form.get('location')?.invalid && form.get('location')?.touched"
-                  class="text-sm text-red-600"
-                >
-                  Local é obrigatório
-                </span>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2"
-                  >Capacidade Máxima *</label
-                >
-                <input
-                  type="number"
-                  formControlName="capacity"
-                  placeholder="100"
-                  min="1"
-                  class="input-field"
-                />
-                <span
-                  *ngIf="form.get('capacity')?.invalid && form.get('capacity')?.touched"
-                  class="text-sm text-red-600"
-                >
-                  Capacidade é obrigatória e deve ser maior que 0
-                </span>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Registrados *</label>
-                <input
-                  type="number"
-                  formControlName="registered"
-                  placeholder="0"
-                  min="0"
-                  class="input-field"
-                />
-                <span
-                  *ngIf="form.get('registered')?.invalid && form.get('registered')?.touched"
-                  class="text-sm text-red-600"
-                >
-                  Registrados é obrigatório
-                </span>
               </div>
             </div>
           </div>
@@ -169,19 +114,13 @@ import { Subscription } from 'rxjs';
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Responsáveis</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Responsável *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
                 <input
                   type="text"
                   formControlName="responsible"
                   placeholder="Ex: Pastor João"
                   class="input-field"
                 />
-                <span
-                  *ngIf="form.get('responsible')?.invalid && form.get('responsible')?.touched"
-                  class="text-sm text-red-600"
-                >
-                  Responsável é obrigatório
-                </span>
               </div>
 
               <div>
@@ -201,9 +140,7 @@ import { Subscription } from 'rxjs';
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Descrição</h3>
             <div class="grid grid-cols-1 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2"
-                  >Descrição do Evento</label
-                >
+                <label class="block text-sm font-medium text-gray-700 mb-2">Descrição do Evento</label>
                 <textarea
                   formControlName="description"
                   placeholder="Descreva os detalhes do evento..."
@@ -275,13 +212,11 @@ export class EventFormComponent implements OnInit, OnDestroy {
       name: ['', [Validators.required, Validators.minLength(3)]],
       description: [''],
       date: [new Date().toISOString().split('T')[0], Validators.required],
-      time: ['10:00', Validators.required],
-      location: ['', Validators.required],
+      time: ['10:00'],
+      location: [''],
       category: ['', Validators.required],
-      capacity: [100, [Validators.required, Validators.min(1)]],
-      registered: [0, [Validators.required, Validators.min(0)]],
-      status: ['scheduled', Validators.required],
-      responsible: ['', Validators.required],
+      status: ['scheduled'],
+      responsible: [''],
       coordinator: [''],
       notes: [''],
     });
@@ -291,17 +226,13 @@ export class EventFormComponent implements OnInit, OnDestroy {
     this.subscription = this.eventsService.getEventById(id).subscribe({
       next: (event) => {
         if (event) {
-          const dateStr = new Date(event.date).toISOString().split('T')[0];
-          
           const patchData = {
             name: event.name,
             description: event.description || '',
-            date: dateStr,
+            date: this.formatDateForInput(event.date),
             time: event.time || '10:00',
-            location: event.location,
+            location: event.location || '',
             category: event.category,
-            capacity: Number(event.capacity),
-            registered: Number(event.registered),
             status: event.status,
             responsible: event.responsible || '',
             coordinator: event.coordinator || '',
@@ -323,6 +254,23 @@ export class EventFormComponent implements OnInit, OnDestroy {
     });
   }
 
+  private formatDateForInput(date: Date | string | any): string {
+    if (!date) return '';
+    
+    // Se for Timestamp do Firestore (tem método toDate)
+    if (typeof date.toDate === 'function') {
+      date = date.toDate();
+    }
+    
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${year}-${month}-${day}`;
+  }
+
   async onSubmit(): Promise<void> {
     if (this.form.invalid) {
       Object.keys(this.form.controls).forEach((key) => {
@@ -338,19 +286,23 @@ export class EventFormComponent implements OnInit, OnDestroy {
     const formValue = this.form.value;
 
     // Combinar data e hora
-    const dateTime = new Date(`${formValue.date}T${formValue.time}`);
+    const dateTime = new Date(`${formValue.date}T${formValue.time || '00:00'}`);
+    
+    // Validar data
+    if (isNaN(dateTime.getTime())) {
+      alert('Data inválida. Por favor, verifique a data informada.');
+      return;
+    }
 
     const eventData: any = {
       name: formValue.name,
       description: formValue.description || '',
       date: dateTime,
-      time: formValue.time,
-      location: formValue.location,
+      time: formValue.time || '00:00',
+      location: formValue.location || '',
       category: formValue.category,
-      capacity: Number(formValue.capacity),
-      registered: Number(formValue.registered),
       status: formValue.status,
-      responsible: formValue.responsible,
+      responsible: formValue.responsible || '',
       coordinator: formValue.coordinator || '',
       notes: formValue.notes || '',
       churchId: 'church-1',

@@ -1,50 +1,36 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, map } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { MediaItem, MediaStats } from '../../shared/models';
-import { MediaStorageService } from './media-storage.service';
+import { MediaDatabaseService } from './media-database.service';
 
 /**
- * Serviço de Mídia com suporte a IndexedDB
+ * Serviço de Mídia com suporte a Firebase Storage e Firestore
  * Gerencia upload, listagem, busca e estatísticas de mídias
- * Integrado com armazenamento persistente para produção
  */
 @Injectable({
   providedIn: 'root',
 })
 export class MediaService {
-  private mediaItemsSubject = new BehaviorSubject<MediaItem[]>([]);
-  private mediaItems$ = this.mediaItemsSubject.asObservable();
-
-  constructor(private storageService: MediaStorageService) {
-    // Sincroniza mídias do armazenamento persistente com memória
-    this.storageService.getMediaItems().subscribe((items) => {
-      this.mediaItemsSubject.next(items);
-    });
-  }
+  constructor(private databaseService: MediaDatabaseService) {}
 
   // ========== MÍDIAS ==========
 
   getMediaItems(): Observable<MediaItem[]> {
-    return this.mediaItems$;
+    return this.databaseService.getMedia();
   }
 
   getMediaItemById(id: string): Observable<MediaItem | undefined> {
-    return new Observable((observer) => {
-      this.mediaItems$.subscribe((items) => {
-        observer.next(items.find((item) => item.id === id));
-        observer.complete();
-      });
-    });
+    return this.databaseService.getMediaById(id);
   }
 
   getMediaByType(type: 'photo' | 'video' | 'document'): Observable<MediaItem[]> {
-    return this.mediaItems$.pipe(
+    return this.databaseService.getMedia().pipe(
       map((items) => items.filter((item) => item.type === type && item.status === 'published'))
     );
   }
 
   getPublishedMedia(): Observable<MediaItem[]> {
-    return this.mediaItems$.pipe(
+    return this.databaseService.getMedia().pipe(
       map((items) =>
         items
           .filter((item) => item.status === 'published')
@@ -53,50 +39,31 @@ export class MediaService {
     );
   }
 
-  uploadMedia(media: Omit<MediaItem, 'id' | 'createdAt' | 'updatedAt'>): void {
-    const newMedia: MediaItem = {
-      ...media,
-      id: `media-${Date.now()}`,
-      views: 0,
-      likes: 0,
-      comments: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+  /**
+   * Upload de mídia com arquivo
+   */
+  async uploadMediaWithFile(
+    file: File,
+    metadata: Omit<MediaItem, 'id' | 'mediaUrl' | 'thumbnailUrl' | 'createdAt' | 'updatedAt' | 'fileSize'>
+  ): Promise<string> {
+    return this.databaseService.uploadMedia(file, metadata);
+  }
 
-    // Salva no IndexedDB de forma assincronizada
-    this.storageService
-      .saveMediaItem(newMedia)
-      .then(() => {
-        console.log(`Mídia salva com sucesso: ${newMedia.id}`);
-      })
-      .catch((error) => {
-        console.error('Erro ao salvar mídia:', error);
-      });
+  /**
+   * Upload de mídia (compatibilidade com código antigo que usa Base64)
+   * @deprecated Use uploadMediaWithFile para novos uploads
+   */
+  uploadMedia(media: Omit<MediaItem, 'id' | 'createdAt' | 'updatedAt'>): void {
+    console.warn('uploadMedia com Base64 está deprecated. Use uploadMediaWithFile.');
+    // Não implementado - código antigo deve ser migrado para uploadMediaWithFile
   }
 
   updateMedia(id: string, media: Partial<Omit<MediaItem, 'id' | 'createdAt'>>): void {
-    // Atualiza no IndexedDB de forma assincronizada
-    this.storageService
-      .updateMediaItem(id, media)
-      .then(() => {
-        console.log(`Mídia atualizada: ${id}`);
-      })
-      .catch((error) => {
-        console.error('Erro ao atualizar mídia:', error);
-      });
+    this.databaseService.updateMedia(id, media);
   }
 
   deleteMedia(id: string): void {
-    // Deleta do IndexedDB de forma assincronizada
-    this.storageService
-      .deleteMediaItem(id)
-      .then(() => {
-        console.log(`Mídia deletada: ${id}`);
-      })
-      .catch((error) => {
-        console.error('Erro ao deletar mídia:', error);
-      });
+    this.databaseService.deleteMedia(id);
   }
 
   publishMedia(id: string): void {
@@ -108,8 +75,7 @@ export class MediaService {
   }
 
   incrementViews(id: string): void {
-    this.mediaItems$.subscribe((items) => {
-      const item = items.find((m) => m.id === id);
+    this.getMediaItemById(id).subscribe((item) => {
       if (item && item.views !== undefined) {
         this.updateMedia(id, { views: item.views + 1 });
       }
@@ -117,8 +83,7 @@ export class MediaService {
   }
 
   likeMedia(id: string): void {
-    this.mediaItems$.subscribe((items) => {
-      const item = items.find((m) => m.id === id);
+    this.getMediaItemById(id).subscribe((item) => {
       if (item && item.likes !== undefined) {
         this.updateMedia(id, { likes: item.likes + 1 });
       }
@@ -126,22 +91,21 @@ export class MediaService {
   }
 
   searchMedia(query: string): Observable<MediaItem[]> {
-    return new Observable((observer) => {
-      this.mediaItems$.subscribe((items) => {
-        const filtered = items.filter(
+    return this.databaseService.getMedia().pipe(
+      map((items) =>
+        items.filter(
           (item) =>
             (item.title.toLowerCase().includes(query.toLowerCase()) ||
               item.description?.toLowerCase().includes(query.toLowerCase()) ||
               item.tags?.some((tag) => tag.toLowerCase().includes(query.toLowerCase()))) &&
             item.status === 'published'
-        );
-        observer.next(filtered);
-      });
-    });
+        )
+      )
+    );
   }
 
   getMediaStats(): Observable<MediaStats> {
-    return this.mediaItems$.pipe(
+    return this.databaseService.getMedia().pipe(
       map((items) => {
         const published = items.filter((item) => item.status === 'published');
         return {
@@ -155,6 +119,8 @@ export class MediaService {
       })
     );
   }
+
+  // ========== UTILITÁRIOS ==========
 
   convertFileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {

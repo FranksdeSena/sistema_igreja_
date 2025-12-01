@@ -66,27 +66,6 @@ import { map, startWith, debounceTime } from 'rxjs/operators';
           </div>
         </div>
 
-        <!-- Total Registrados -->
-        <div class="card-hover p-4 md:p-5">
-          <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Registrados</p>
-          <div class="flex items-end justify-between gap-3">
-            <p class="text-lg md:text-xl font-bold text-primary-blue break-words">
-              {{ (summary$ | async)?.totalRegistered || 0 }}
-            </p>
-            <span class="flex-shrink-0 text-lg md:text-xl opacity-20">👥</span>
-          </div>
-        </div>
-
-        <!-- Capacidade Média -->
-        <div class="card-hover p-4 md:p-5">
-          <p class="text-gray-600 text-xs md:text-sm mb-2 truncate">Cap. Média</p>
-          <div class="flex items-end justify-between gap-3">
-            <p class="text-lg md:text-xl font-bold text-primary-blue break-words">
-              {{ (summary$ | async)?.averageCapacity || 0 }}
-            </p>
-            <span class="flex-shrink-0 text-lg md:text-xl opacity-20">📊</span>
-          </div>
-        </div>
       </div>
 
       <!-- Filtros -->
@@ -121,7 +100,6 @@ import { map, startWith, debounceTime } from 'rxjs/operators';
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Local</th>
-              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Registrados</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
               <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Ações</th>
             </tr>
@@ -138,9 +116,7 @@ import { map, startWith, debounceTime } from 'rxjs/operators';
                 <span class="badge">{{ event.category }}</span>
               </td>
               <td class="px-4 py-3 text-xs md:text-sm text-gray-700">{{ event.location }}</td>
-              <td class="px-4 py-3 text-xs md:text-sm text-gray-900">
-                {{ event.registered }}/{{ event.capacity }}
-              </td>
+
               <td class="px-4 py-3 text-xs md:text-sm">
                 <span [ngClass]="getStatusBadgeClass(event.status)">
                   {{ getStatusLabel(event.status) }}
@@ -183,9 +159,7 @@ import { map, startWith, debounceTime } from 'rxjs/operators';
             <span class="badge text-xs">{{ event.category }}</span>
             <span class="text-xs text-gray-600">📍 {{ event.location }}</span>
           </div>
-          <div class="mb-3 text-xs text-gray-700">
-            👥 {{ event.registered }}/{{ event.capacity }} registrados
-          </div>
+
           <div class="flex gap-2">
             <a [routerLink]="['editar', event.id]" class="flex-1 btn-primary text-xs text-center">
               ✏️ Editar

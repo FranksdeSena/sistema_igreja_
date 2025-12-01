@@ -4,6 +4,7 @@ import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
 import { map, switchMap, catchError, tap } from 'rxjs/operators';
+import { AuditService } from './audit.service';
 
 export interface User {
   id: string;
@@ -28,6 +29,7 @@ export class FirebaseAuthService {
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
   private router = inject(Router);
+  private auditService = inject(AuditService);
 
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
@@ -136,7 +138,21 @@ export class FirebaseAuthService {
             user,
             error: null,
             isAuthenticated: true
-          }))
+          })),
+          tap(async (response) => {
+            if (response.user) {
+              await this.auditService.logAction({
+                userId: response.user.id,
+                userName: response.user.full_name,
+                userEmail: response.user.email,
+                action: 'LOGIN',
+                module: 'auth',
+                entityId: response.user.id,
+                entityName: response.user.full_name,
+                description: 'Login realizado com sucesso'
+              });
+            }
+          })
         );
       }),
       catchError((error) => {
@@ -157,8 +173,22 @@ export class FirebaseAuthService {
   }
 
   signOut(): Observable<void> {
+    const currentUser = this.currentUserSubject.value;
+    
     return from(signOut(this.auth)).pipe(
-      tap(() => {
+      tap(async () => {
+        if (currentUser) {
+          await this.auditService.logAction({
+            userId: currentUser.id,
+            userName: currentUser.full_name,
+            userEmail: currentUser.email,
+            action: 'LOGOUT',
+            module: 'auth',
+            entityId: currentUser.id,
+            entityName: currentUser.full_name,
+            description: 'Logout realizado com sucesso'
+          });
+        }
         this.router.navigate(['/auth/login']);
       })
     );

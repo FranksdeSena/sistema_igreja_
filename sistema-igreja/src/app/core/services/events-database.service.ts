@@ -107,14 +107,28 @@ export class EventsDatabaseService {
    */
   async updateEvent(id: string, eventData: Partial<Event>): Promise<void> {
     const docRef = doc(this.firestore, 'events', id);
+    
+    // Preparar dados para atualização
     const data: any = {
       ...eventData,
       updatedAt: Timestamp.fromDate(new Date())
     };
 
+    // Converter data se presente
     if (eventData.date) {
-      data.date = Timestamp.fromDate(new Date(eventData.date));
+      // Garantir que é um objeto Date válido
+      const dateObj = eventData.date instanceof Date ? eventData.date : new Date(eventData.date);
+      if (!isNaN(dateObj.getTime())) {
+        data.date = Timestamp.fromDate(dateObj);
+      } else {
+        delete data.date; // Não atualizar se data for inválida
+      }
     }
+
+    // Remover campos undefined para evitar erros no Firestore
+    Object.keys(data).forEach(key => 
+      data[key] === undefined && delete data[key]
+    );
 
     await updateDoc(docRef, data);
   }
@@ -133,89 +147,33 @@ export class EventsDatabaseService {
    * Retorna eventos por categoria
    */
   getEventsByCategory(category: string): Observable<Event[]> {
-    return new Observable<Event[]>(observer => {
-      const q = query(
-        this.eventsCollection,
-        where('category', '==', category),
-        orderBy('date', 'desc')
-      );
-      
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const events = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            date: data['date']?.toDate() || new Date(),
-            createdAt: data['createdAt']?.toDate() || new Date(),
-            updatedAt: data['updatedAt']?.toDate() || new Date()
-          } as Event;
-        });
-        observer.next(events);
-      });
-
-      return () => unsubscribe();
-    });
+    return this.getEvents().pipe(
+      map(events => events.filter(e => e.category === category))
+    );
   }
 
   /**
    * Retorna eventos por status
    */
   getEventsByStatus(status: string): Observable<Event[]> {
-    return new Observable<Event[]>(observer => {
-      const q = query(
-        this.eventsCollection,
-        where('status', '==', status),
-        orderBy('date', 'desc')
-      );
-      
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const events = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            date: data['date']?.toDate() || new Date(),
-            createdAt: data['createdAt']?.toDate() || new Date(),
-            updatedAt: data['updatedAt']?.toDate() || new Date()
-          } as Event;
-        });
-        observer.next(events);
-      });
-
-      return () => unsubscribe();
-    });
+    return this.getEvents().pipe(
+      map(events => events.filter(e => e.status === status))
+    );
   }
 
   /**
    * Retorna eventos futuros (próximos)
    */
   getUpcomingEvents(): Observable<Event[]> {
-    return new Observable<Event[]>(observer => {
-      const now = Timestamp.fromDate(new Date());
-      const q = query(
-        this.eventsCollection,
-        where('date', '>=', now),
-        where('status', 'in', ['scheduled', 'ongoing']),
-        orderBy('date', 'asc')
-      );
-      
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const events = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            date: data['date']?.toDate() || new Date(),
-            createdAt: data['createdAt']?.toDate() || new Date(),
-            updatedAt: data['updatedAt']?.toDate() || new Date()
-          } as Event;
-        });
-        observer.next(events);
-      });
-
-      return () => unsubscribe();
-    });
+    return this.getEvents().pipe(
+      map(events => {
+        const now = new Date();
+        return events.filter(event => {
+          const eventDate = new Date(event.date);
+          return eventDate >= now && (event.status === 'scheduled' || event.status === 'ongoing');
+        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      })
+    );
   }
 
   // ==================== Contadores em Tempo Real ====================
@@ -247,27 +205,7 @@ export class EventsDatabaseService {
     );
   }
 
-  /**
-   * Total de pessoas registradas em todos os eventos
-   */
-  getTotalRegistered(): Observable<number> {
-    return this.getEvents().pipe(
-      map(events => events.reduce((sum, event) => sum + (event.registered || 0), 0))
-    );
-  }
 
-  /**
-   * Capacidade média dos eventos
-   */
-  getAverageCapacity(): Observable<number> {
-    return this.getEvents().pipe(
-      map(events => {
-        if (events.length === 0) return 0;
-        const total = events.reduce((sum, event) => sum + (event.capacity || 0), 0);
-        return Math.round(total / events.length);
-      })
-    );
-  }
 
   /**
    * Resumo completo de eventos
@@ -276,16 +214,12 @@ export class EventsDatabaseService {
     return combineLatest([
       this.getTotalEvents(),
       this.getUpcomingEventsCount(),
-      this.getCompletedEventsCount(),
-      this.getTotalRegistered(),
-      this.getAverageCapacity()
+      this.getCompletedEventsCount()
     ]).pipe(
-      map(([total, upcoming, completed, registered, avgCapacity]) => ({
+      map(([total, upcoming, completed]) => ({
         totalEvents: total,
         upcomingEvents: upcoming,
-        completedEvents: completed,
-        totalRegistered: registered,
-        averageCapacity: avgCapacity
+        completedEvents: completed
       }))
     );
   }

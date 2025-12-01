@@ -49,6 +49,33 @@ import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
           </a>
 
           <a
+            routerLink="/dashboard/aniversariantes"
+            routerLinkActive="bg-blue-50 text-primary-blue"
+            class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
+          >
+            <span class="mr-3 text-xl group-hover:scale-110 transition-transform">🎂</span>
+            <span class="font-medium">Aniversariantes</span>
+          </a>
+
+          <a
+            routerLink="/dashboard/celulas"
+            routerLinkActive="bg-blue-50 text-primary-blue"
+            class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
+          >
+            <span class="mr-3 text-xl group-hover:scale-110 transition-transform">🏘️</span>
+            <span class="font-medium">Células</span>
+          </a>
+
+          <a
+            routerLink="/dashboard/ministerios"
+            routerLinkActive="bg-blue-50 text-primary-blue"
+            class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
+          >
+            <span class="mr-3 text-xl group-hover:scale-110 transition-transform">🎤</span>
+            <span class="font-medium">Ministérios</span>
+          </a>
+
+          <a
             routerLink="/dashboard/financeiro"
             routerLinkActive="bg-blue-50 text-primary-blue"
             class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
@@ -75,6 +102,19 @@ import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
             <span class="font-medium">Mídia</span>
           </a>
 
+          <!-- Pastor Only (Admin also sees) -->
+          <div *ngIf="['admin', 'pastor'].includes((authService.currentUser$ | async)?.role || '')" class="pt-4 mt-4 border-t border-gray-100">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pastoral</p>
+            <a
+              routerLink="/dashboard/pastor"
+              routerLinkActive="bg-blue-50 text-primary-blue"
+              class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
+            >
+              <span class="mr-3 text-xl group-hover:scale-110 transition-transform">✝️</span>
+              <span class="font-medium">Área Pastoral</span>
+            </a>
+          </div>
+
           <!-- Admin Only -->
           <div *ngIf="(authService.currentUser$ | async)?.role === 'admin'" class="pt-4 mt-4 border-t border-gray-100">
             <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Administração</p>
@@ -85,6 +125,14 @@ import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
             >
               <span class="mr-3 text-xl group-hover:scale-110 transition-transform">🛡️</span>
               <span class="font-medium">Usuários</span>
+            </a>
+            <a
+              routerLink="/dashboard/auditoria"
+              routerLinkActive="bg-blue-50 text-primary-blue"
+              class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 group transition-colors"
+            >
+              <span class="mr-3 text-xl group-hover:scale-110 transition-transform">📋</span>
+              <span class="font-medium">Auditoria</span>
             </a>
           </div>
         </nav>
@@ -210,9 +258,13 @@ export class DashboardLayoutComponent implements OnInit {
   private updatePageTitle() {
     const url = this.router.url;
     if (url.includes('/membros')) this.pageTitle = 'Gestão de Membros';
+    else if (url.includes('/aniversariantes')) this.pageTitle = 'Aniversariantes';
+    else if (url.includes('/celulas')) this.pageTitle = 'Células';
+    else if (url.includes('/ministerios')) this.pageTitle = 'Ministérios';
     else if (url.includes('/financeiro')) this.pageTitle = 'Gestão Financeira';
     else if (url.includes('/eventos')) this.pageTitle = 'Gestão de Eventos';
     else if (url.includes('/midia')) this.pageTitle = 'Gestão de Mídia';
+    else if (url.includes('/auditoria')) this.pageTitle = 'Auditoria do Sistema';
     else this.pageTitle = 'Visão Geral';
   }
 }

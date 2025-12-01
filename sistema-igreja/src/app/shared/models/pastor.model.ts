@@ -1,46 +1,60 @@
-// Pregação/Sermão
-export interface Sermon {
+export interface PastorWord {
   id: string;
-  churchId: string;
   title: string;
-  pastor: string;
-  biblicalText: string; // Ex: João 3:16
-  date: Date;
-  duration: number; // em minutos
-  summary: string;
-  topicCategory: string; // Salvação, Amor, Fé, Graça, Missão, Outro
-  status: 'scheduled' | 'completed' | 'cancelled';
-  audioUrl?: string;
-  videoUrl?: string;
-  attendance: number; // Número de pessoas que assistiram
-  notes: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
-// Visita Pastoral
+export interface Sermon {
+  id: string;
+  churchId?: string;
+  title: string;
+  series?: string;
+  preacher?: string; // Usado no novo form
+  pastor?: string;   // Usado no legacy form/service
+  date: string | Date;
+  scriptureReference?: string; // Usado no novo form
+  biblicalText?: string;       // Usado no legacy form/service
+  notes?: string;
+  mediaUrl?: string; // Usado no novo form
+  audioUrl?: string; // Usado no legacy form
+  videoUrl?: string; // Usado no legacy form
+  tags?: string[];
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  createdBy?: string;
+  duration?: number;
+  summary?: string;
+  topicCategory?: string;
+  status?: 'scheduled' | 'completed' | 'cancelled';
+  attendance?: number;
+}
+
 export interface PastoralVisit {
   id: string;
   churchId: string;
   memberId: string;
   memberName: string;
   pastor: string;
-  date: Date;
-  time: string; // HH:MM format
-  visitType: string; // Acompanhamento, Oração, Aconselhamento, Doença, Bem-vindo, Outro
+  date: Date | string;
+  time: string;
+  visitType: string;
   subject: string;
   outcome: string;
   status: 'scheduled' | 'completed' | 'cancelled';
   followUpNeeded: boolean;
-  followUpDate?: Date;
-  notes: string;
-  createdAt: Date;
-  updatedAt: Date;
+  followUpDate?: Date | string;
+  notes?: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   createdBy: string;
 }
 
-// Resumo de Atividades Pastorais
 export interface PastoralSummary {
   totalSermons: number;
   totalVisits: number;
@@ -50,19 +64,16 @@ export interface PastoralSummary {
   averageDuration: number;
 }
 
-// Palavra do Pastor (Mensagem Diária)
 export interface PastorDailyMessage {
   id: string;
   churchId: string;
   title: string;
   pastor: string;
   message: string;
-  biblicalText?: string; // Ex: Salmos 23:1
-  date: Date;
+  biblicalText: string;
+  date: Date | string;
   status: 'draft' | 'published' | 'archived';
-  imageUrl?: string;
   tags?: string[];
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }

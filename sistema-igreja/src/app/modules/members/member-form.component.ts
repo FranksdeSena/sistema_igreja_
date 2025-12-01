@@ -211,14 +211,41 @@ export class MemberFormComponent implements OnInit {
   }
 
   loadMember(id: string): void {
-    this.membersService.getMemberById(id).subscribe((member) => {
-      if (member) {
-        this.form.patchValue({
-          ...member,
-          birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split('T')[0] : '',
-          joinDate: member.joinDate ? new Date(member.joinDate).toISOString().split('T')[0] : '',
-        });
-      }
+    console.log('🔍 Buscando membro:', id);
+    this.membersService.getMemberById(id).subscribe({
+      next: (member) => {
+        if (member) {
+          console.log('✅ Membro encontrado:', member);
+          
+          // Converter datas para formato YYYY-MM-DD para o input type="date"
+          const birthDateStr = member.birthDate instanceof Date && !isNaN(member.birthDate.getTime())
+            ? member.birthDate.toISOString().split('T')[0] 
+            : '';
+            
+          const joinDateStr = member.joinDate instanceof Date && !isNaN(member.joinDate.getTime())
+            ? member.joinDate.toISOString().split('T')[0] 
+            : '';
+
+          console.log('📅 Datas convertidas:', { birthDateStr, joinDateStr });
+
+          this.form.patchValue({
+            name: member.name,
+            phone: member.phone,
+            whatsapp: member.whatsapp,
+            birthDate: birthDateStr,
+            joinDate: joinDateStr,
+            status: member.status,
+            role: member.role,
+            address: member.address,
+            city: member.city,
+            state: member.state,
+            zipCode: member.zipCode
+          });
+        } else {
+          console.error('❌ Membro não encontrado no banco de dados');
+        }
+      },
+      error: (err) => console.error('❌ Erro ao buscar membro:', err)
     });
   }
 

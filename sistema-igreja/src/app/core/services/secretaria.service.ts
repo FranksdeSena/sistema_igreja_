@@ -9,13 +9,13 @@ import {
   CommunicationRecipientFilter,
   CommunicationPreview,
 } from '../../shared/models';
-import { MembersService } from './members.service';
+import { MembersDatabaseService } from './members-database.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class SecretariaService {
-  constructor(private membersService: MembersService) {}
+  constructor(private membersService: MembersDatabaseService) {}
   // Documentos
   private documentsSubject = new BehaviorSubject<Document[]>([
     {

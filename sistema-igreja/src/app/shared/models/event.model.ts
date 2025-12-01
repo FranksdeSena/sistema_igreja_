@@ -8,12 +8,12 @@ export interface Event {
   time: string; // HH:MM format
   location: string;
   category: string; // Culto, Reunião, Treinamento, Social, Missão, Outra
-  capacity: number; // Capacidade máxima
-  registered: number; // Pessoas registradas
+  capacity?: number; // Capacidade máxima
+  registered?: number; // Pessoas registradas
   status: 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
-  responsible: string; // Responsável pelo evento
-  coordinator: string; // Coordenador
-  notes: string;
+  responsible?: string; // Responsável pelo evento
+  coordinator?: string; // Coordenador
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
@@ -24,8 +24,6 @@ export interface EventSummary {
   totalEvents: number;
   upcomingEvents: number;
   completedEvents: number;
-  totalRegistered: number;
-  averageCapacity: number;
 }
 
 // Inscrição em evento

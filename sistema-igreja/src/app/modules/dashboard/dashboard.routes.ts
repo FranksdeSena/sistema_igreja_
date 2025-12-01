@@ -1,15 +1,14 @@
 import { Routes } from '@angular/router';
-import { DashboardLayoutComponent } from './dashboard-layout.component';
-import { DashboardHomeComponent } from './dashboard-home.component';
+import { adminGuard } from '../../core/guards/admin.guard';
 
-export const DASHBOARD_ROUTES: Routes = [
+const DASHBOARD_ROUTES: Routes = [
   {
     path: '',
-    component: DashboardLayoutComponent,
+    loadComponent: () => import('./dashboard-layout.component').then(m => m.DashboardLayoutComponent),
     children: [
       {
         path: '',
-        component: DashboardHomeComponent,
+        loadComponent: () => import('./dashboard-home.component').then(m => m.DashboardHomeComponent),
       },
       {
         path: 'membros',
@@ -24,40 +23,66 @@ export const DASHBOARD_ROUTES: Routes = [
         loadComponent: () => import('../members/member-form.component').then(m => m.MemberFormComponent)
       },
       {
-        path: 'usuarios',
-        loadComponent: () => import('../admin/users/users.component').then(m => m.UsersComponent)
+        path: 'aniversariantes',
+        loadComponent: () => import('../birthdays/birthdays.component').then(m => m.BirthdaysComponent)
       },
       {
-        path: 'usuarios/novo',
-        loadComponent: () => import('../admin/users/user-form.component').then(m => m.UserFormComponent)
+        path: 'celulas',
+        loadComponent: () => import('../cells/cells.component').then(m => m.CellsComponent)
       },
       {
-        path: 'usuarios/editar/:id',
-        loadComponent: () => import('../admin/users/user-form.component').then(m => m.UserFormComponent)
+        path: 'celulas/nova',
+        loadComponent: () => import('../cells/cell-form.component').then(m => m.CellFormComponent)
+      },
+      {
+        path: 'celulas/editar/:id',
+        loadComponent: () => import('../cells/cell-form.component').then(m => m.CellFormComponent)
+      },
+      {
+        path: 'celulas/:id',
+        loadComponent: () => import('../cells/cell-details.component').then(m => m.CellDetailsComponent)
+      },
+      {
+        path: 'ministerios',
+        loadComponent: () => import('../ministries/ministries.component').then(m => m.MinistriesComponent)
+      },
+      {
+        path: 'ministerios/novo',
+        loadComponent: () => import('../ministries/ministry-form.component').then(m => m.MinistryFormComponent)
+      },
+      {
+        path: 'ministerios/editar/:id',
+        loadComponent: () => import('../ministries/ministry-form.component').then(m => m.MinistryFormComponent)
+      },
+      {
+        path: 'ministerios/:id',
+        loadComponent: () => import('../ministries/ministry-details.component').then(m => m.MinistryDetailsComponent)
       },
       {
         path: 'financeiro',
         loadComponent: () => import('../finance/finance.component').then(m => m.FinanceComponent)
       },
       {
-        path: 'financeiro/novo',
-        loadComponent: () => import('../finance/finance-form.component').then(m => m.FinanceFormComponent)
-      },
-      {
-        path: 'financeiro/editar/:id',
-        loadComponent: () => import('../finance/finance-form.component').then(m => m.FinanceFormComponent)
-      },
-      {
         path: 'eventos',
-        loadComponent: () => import('../events/events.component').then(m => m.EventsComponent)
+        loadChildren: () => import('../events/events.routes').then(m => m.EVENTS_ROUTES)
       },
       {
-        path: 'eventos/novo',
-        loadComponent: () => import('../events/event-form.component').then(m => m.EventFormComponent)
+        path: 'usuarios',
+        loadComponent: () => import('../admin/users/users.component').then(m => m.UsersComponent)
       },
       {
-        path: 'eventos/editar/:id',
-        loadComponent: () => import('../events/event-form.component').then(m => m.EventFormComponent)
+        path: 'auditoria',
+        loadComponent: () => import('../audit/audit.component').then(m => m.AuditComponent),
+        canActivate: [adminGuard]
+      },
+      {
+        path: 'auditoria/:id',
+        loadComponent: () => import('../audit/audit-details.component').then(m => m.AuditDetailsComponent),
+        canActivate: [adminGuard]
+      },
+      {
+        path: 'pastor',
+        loadChildren: () => import('../pastor/pastor.routes').then(m => m.PASTOR_ROUTES)
       },
     ],
   },
