@@ -29,25 +29,69 @@ service cloud.firestore {
       return isAuthenticated() && (role == 'admin' || role == 'secretaria' || role == 'pastor');
     }
 
-    // Regras para a coleção de usuários
+    // Regras para a coleção de usuários e sessões
     match /users/{userId} {
-      // Qualquer usuário autenticado pode ler dados de usuários
       allow read: if isAuthenticated();
-      
-      // Apenas admin pode criar, atualizar ou deletar usuários
       allow create, update, delete: if isAdmin();
+      
+      // Regras para sessão do usuário
+      match /session/{sessionId} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
 
     // Regras para a coleção de membros
     match /members/{memberId} {
-      // Todos autenticados podem ler
       allow read: if isAuthenticated();
-      
-      // Admin, Pastor e Secretaria podem criar e atualizar
       allow create, update: if canManageMembers();
-      
-      // Apenas Admin pode deletar
       allow delete: if isAdmin();
+    }
+
+    // Regras para Testemunhos
+    match /testimonies/{testimonyId} {
+      // Qualquer um pode ler testemunhos públicos e aprovados
+      allow read: if (resource.data.isPublic == true && resource.data.isApproved == true) || isAuthenticated();
+      // Apenas autenticados podem criar (dashboard) ou admin aprovar
+      allow create: if isAuthenticated();
+      allow update, delete: if canManageMembers();
+    }
+
+    // Regras para Pedidos de Oração
+    match /prayer_requests/{requestId} {
+      // Público pode criar (enviar pedido)
+      allow create: if true;
+      // Apenas admin/pastor/secretaria pode ler todos
+      allow read: if canManageMembers();
+      // Leitura pública apenas se aprovado e marcado como público
+      allow read: if (resource.data.isPublic == true && resource.data.isApproved == true);
+      allow update, delete: if canManageMembers();
+    }
+
+    // Regras para Logs de Auditoria
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Sistema cria logs
+      allow update, delete: if false; // Logs são imutáveis
+    }
+    
+    // Regras para outros módulos (Eventos, Ministérios, Células, Finanças)
+    match /events/{eventId} {
+      allow read: if true; // Público pode ver eventos
+      allow write: if canManageMembers();
+    }
+    
+    match /ministries/{ministryId} {
+      allow read: if true;
+      allow write: if canManageMembers();
+    }
+    
+    match /cells/{cellId} {
+      allow read: if true;
+      allow write: if canManageMembers();
+    }
+    
+    match /financial_transactions/{transactionId} {
+      allow read, write: if isAdmin() || (isSecretariaOrAdmin() && request.auth.token.email == 'financeiro@ibn.com'); // Exemplo de restrição extra
     }
   }
 }

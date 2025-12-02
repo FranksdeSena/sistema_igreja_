@@ -242,7 +242,7 @@ export class DashboardLayoutComponent implements OnInit {
   }
 
   onLogout() {
-    this.authService.signOut().subscribe();
+    this.authService.signOut();
   }
 
   getRoleName(role: string): string {

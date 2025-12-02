@@ -15,9 +15,7 @@ export class AppComponent implements OnInit {
   constructor(private authService: AuthService, private router: Router) {}
 
   ngOnInit(): void {
-    // Redirecionar para login se não autenticado
-    if (!this.authService.isAuthenticated()) {
-      this.router.navigate(['/auth/login']);
-    }
+    // Redirecionamento removido para permitir acesso ao site público
+    // O AuthGuard protege as rotas do dashboard
   }
 }

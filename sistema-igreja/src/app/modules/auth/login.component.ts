@@ -97,9 +97,14 @@ import { FirebaseAuthService } from '../../core/services/firebase-auth.service';
           </button>
 
           <!-- Footer -->
-          <p class="text-center text-gray-600 text-sm mt-6">
-            Versão 1.0.0 | © 2025 Sistema Igreja
-          </p>
+          <div class="text-center mt-6">
+            <p class="text-gray-600 text-sm mb-1">
+              © {{ currentYear }} IBN Peniel. Todos os direitos reservados.
+            </p>
+            <p class="text-gray-500 text-xs">
+              Desenvolvido por <a href="https://futurannet.com" target="_blank" class="text-blue-600 hover:text-blue-700 transition-colors">Futurannet Design</a>
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -110,6 +115,7 @@ export class LoginComponent {
   loginForm: FormGroup;
   isLoading = false;
   errorMessage = '';
+  currentYear = new Date().getFullYear();
 
   constructor(
     private fb: FormBuilder,

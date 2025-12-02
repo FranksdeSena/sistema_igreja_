@@ -130,15 +130,22 @@ export class FirebaseAuthService {
     }
   }
 
+  // Chave do localStorage para o ID da sessão
+  private readonly SESSION_KEY = 'user_session_id';
+
   signIn(email: string, password: string): Observable<AuthResponse> {
     return from(signInWithEmailAndPassword(this.auth, email, password)).pipe(
       switchMap((credential) => {
         return from(this.mapFirebaseUserToAppUser(credential.user)).pipe(
-          map(user => ({
-            user,
-            error: null,
-            isAuthenticated: true
-          })),
+          switchMap(async (user) => {
+            // Criar nova sessão após login bem-sucedido
+            await this.createSession(user.id);
+            return {
+              user,
+              error: null,
+              isAuthenticated: true
+            };
+          }),
           tap(async (response) => {
             if (response.user) {
               await this.auditService.logAction({
@@ -148,17 +155,24 @@ export class FirebaseAuthService {
                 action: 'LOGIN',
                 module: 'auth',
                 entityId: response.user.id,
-                entityName: response.user.full_name,
                 description: 'Login realizado com sucesso'
               });
             }
+          }),
+          catchError((error) => {
+            console.error('Erro no processo de login:', error);
+            return of({
+              user: null,
+              error: 'Erro ao processar dados do usuário',
+              isAuthenticated: false
+            });
           })
         );
       }),
       catchError((error) => {
         console.error('Erro no login Firebase:', error);
         let errorMessage = 'Falha ao fazer login';
-        if (error.code === 'auth/invalid-credential') {
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
           errorMessage = 'Email ou senha incorretos';
         } else if (error.code === 'auth/too-many-requests') {
           errorMessage = 'Muitas tentativas. Tente novamente mais tarde.';
@@ -172,29 +186,85 @@ export class FirebaseAuthService {
     );
   }
 
-  signOut(): Observable<void> {
-    const currentUser = this.currentUserSubject.value;
-    
-    return from(signOut(this.auth)).pipe(
-      tap(async () => {
-        if (currentUser) {
-          await this.auditService.logAction({
-            userId: currentUser.id,
-            userName: currentUser.full_name,
-            userEmail: currentUser.email,
-            action: 'LOGOUT',
-            module: 'auth',
-            entityId: currentUser.id,
-            entityName: currentUser.full_name,
-            description: 'Logout realizado com sucesso'
-          });
-        }
-        this.router.navigate(['/auth/login']);
-      })
-    );
+  async signOut(): Promise<void> {
+    const user = this.currentUserSubject.value;
+    if (user) {
+      await this.clearSession(user.id);
+      await this.auditService.logAction({
+        userId: user.id,
+        userName: user.full_name,
+        userEmail: user.email,
+        action: 'LOGOUT',
+        module: 'auth',
+        entityId: user.id,
+        description: 'Logout realizado'
+      });
+    }
+    await signOut(this.auth);
+    this.currentUserSubject.next(null);
+    this.isAuthenticatedSubject.next(false);
+    this.router.navigate(['/auth/login']);
   }
 
   isAdmin(): boolean {
     return this.currentUserSubject.value?.role === 'admin';
+  }
+
+  // --- Gestão de Sessão ---
+
+  private generateSessionId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback simples
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  private async createSession(userId: string): Promise<void> {
+    const sessionId = this.generateSessionId();
+    const sessionRef = doc(this.firestore, `users/${userId}/session/current`);
+    
+    const sessionData = {
+      sessionId,
+      userId,
+      loginTime: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      deviceInfo: navigator.userAgent
+    };
+
+    await setDoc(sessionRef, sessionData);
+    localStorage.setItem(this.SESSION_KEY, sessionId);
+  }
+
+  private async clearSession(userId: string): Promise<void> {
+    localStorage.removeItem(this.SESSION_KEY);
+    // Opcional: Limpar no Firestore também se quiser
+  }
+
+  // Verifica se a sessão local corresponde à sessão no Firestore
+  async validateSession(): Promise<boolean> {
+    const user = this.currentUserSubject.value;
+    if (!user) return true; // Se não tá logado, ignora
+
+    const localSessionId = localStorage.getItem(this.SESSION_KEY);
+    if (!localSessionId) return false; // Tem user mas não tem sessão local
+
+    try {
+      const sessionRef = doc(this.firestore, `users/${user.id}/session/current`);
+      const sessionSnap = await getDoc(sessionRef);
+
+      if (sessionSnap.exists()) {
+        const remoteSession = sessionSnap.data();
+        // Se o ID remoto for diferente do local, significa que outro login sobrescreveu
+        return remoteSession['sessionId'] === localSessionId;
+      }
+      return false; // Sessão não existe no servidor
+    } catch (error) {
+      console.error('Erro ao validar sessão:', error);
+      return true; // Fail open para não bloquear em erro de rede
+    }
   }
 }
