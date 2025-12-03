@@ -138,8 +138,14 @@ export class FirebaseAuthService {
       switchMap((credential) => {
         return from(this.mapFirebaseUserToAppUser(credential.user)).pipe(
           switchMap(async (user) => {
-            // Criar nova sessão após login bem-sucedido
-            await this.createSession(user.id);
+            try {
+              // Criar nova sessão após login bem-sucedido
+              await this.createSession(user.id);
+            } catch (sessionError) {
+              console.error('Erro não-bloqueante ao criar sessão:', sessionError);
+              // Prossegue com o login mesmo se a sessão falhar
+            }
+            
             return {
               user,
               error: null,
