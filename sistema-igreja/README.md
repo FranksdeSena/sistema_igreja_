@@ -9,78 +9,146 @@ Sistema completo de gestão para igrejas desenvolvido com Angular e Firebase, in
 
 ## 📋 Sobre o Projeto
 
-O **Sistema Igreja** é uma solução completa para gestão de igrejas que integra:
-- **Dashboard Administrativo**: Gestão completa de membros, finanças, eventos, ministérios e células
-- **Site Público Institucional**: Página institucional dinâmica com informações da igreja
-- **Área do Pastor**: Gerenciamento de sermões, palavras e mensagens
-- **Sistema de Auditoria**: Log completo de todas as ações do sistema
+Sistema consolidado que oferece funcionalidades essenciais para gestão completa de igrejas:
 
-## ✨ Funcionalidades
+- **Cadastro de Membros** (com número do WhatsApp integrado)
+- **Gestão de Células** (grupos pequenos)
+- **Gestão de Eventos** (agenda e calendário)
+- **Área do Pastor** (palavra do pastor, estudos bíblicos, sermões)
+- **Gestão Financeira** (dízimos, ofertas, despesas com relatórios e export CSV)
+- **Auditoria Completa** (log de todas as ações do sistema)
+- **Dashboard Integrado** (com todas as páginas e relatórios)
+- **Comunicação** (e-mail/WhatsApp)
+- **Site Público Institucional** (home, liderança, agenda, mensagens, galeria, testemunhos, contato)
 
-### 🔐 Dashboard Administrativo
+## 👥 Níveis de Usuários
 
-#### Gestão de Membros
-- ✅ Cadastro completo de membros (dados pessoais, contato, endereço)
-- ✅ Campo de gênero para diferenciação de avatares
-- ✅ Controle de status (Ativo, Inativo, Visitante)
-- ✅ Definição de funções/cargos
-- ✅ Sincronização automática de líderes para área pública
-- ✅ Aniversariantes do mês
+O sistema possui **3 níveis de usuários** com permissões diferenciadas:
 
-#### Gestão Financeira
-- ✅ Registro de dízimos e ofertas
-- ✅ Controle de despesas
-- ✅ Categorização de transações
-- ✅ Relatórios financeiros
-- ✅ Dashboard com gráficos
+### 🔴 Admin
+- Poder total sobre o sistema
+- Pode excluir, editar e criar outros usuários
+- Gerencia permissões de usuários existentes
+- Acesso completo a todos os módulos
 
-#### Gestão de Eventos
-- ✅ Criação e edição de eventos
-- ✅ Categorias (Culto, Reunião, Social, Missão, etc.)
-- ✅ Controle de status (Agendado, Realizado, Cancelado)
-- ✅ Agenda pública
+### 🟡 Pastor
+- Acesso à área pastoral
+- Gerenciamento de sermões e mensagens
+- Visualização de relatórios
+- Sem permissão para excluir usuários
 
-#### Área do Pastor
-- ✅ Gerenciamento de sermões com links do YouTube
-- ✅ Palavra do Pastor (versículo da semana)
-- ✅ Publicação de mensagens
+### 🟢 Secretário(a)
+- Cadastro e edição de membros
+- Gestão de eventos e células
+- Lançamento de finanças
+- Acesso limitado a configurações
 
-#### Ministérios e Células
-- ✅ Cadastro de ministérios
-- ✅ Gestão de células
-- ✅ Associação de líderes
+## 🔐 Autenticação e Segurança
 
-#### Galeria de Mídia
-- ✅ Upload de fotos e vídeos para Firebase Storage
-- ✅ Organização por categorias
-- ✅ Controle de visualizações e curtidas
+- **Firebase Authentication** (Supabase Auth como alternativa)
+- **RBAC** (Role-Based Access Control) - Admin / Pastor / Secretaria
+- **Sessão Única** - Controle de sessão por usuário
+- **Firestore Security Rules** - Proteção de dados sensíveis
+- **Auditoria Completa** - Log de todas as ações (CREATE, UPDATE, DELETE, LOGIN, LOGOUT)
 
-#### Testemunhos e Pedidos de Oração
-- ✅ Sistema de moderação de testemunhos
-- ✅ Formulário público de pedidos de oração
-- ✅ Aprovação e publicação
+## ✨ Funcionalidades Principais
 
-#### Sistema de Auditoria
-- ✅ Log de todas as ações (CREATE, UPDATE, DELETE, LOGIN, LOGOUT)
-- ✅ Rastreamento por usuário e módulo
-- ✅ Exportação de relatórios em CSV
+### � Dashboard Principal
 
-### 🌐 Site Público Institucional
+Resumo executivo com:
+- **Quantidade de membros** (ativos, inativos, visitantes)
+- **Palavra do Pastor** (versículo da semana)
+- **Batismo** (data de início e fim das palestras)
+- **Tema da última pregação** com seus versículos
+- **Mural estilo carrossel infinito** (imagens, fotos, vídeos)
+- **Aniversariantes do mês** em destaque
 
-#### Páginas Dinâmicas
-- ✅ **Home**: Hero section, próximos eventos, palavra do pastor, estatísticas
+### 👥 Gestão de Membros
+
+- Cadastro completo (dados pessoais, contato, endereço)
+- Campo de **gênero** (para diferenciação de avatares 👨👩)
+- Número do **WhatsApp** integrado
+- Controle de status (Ativo, Inativo, Visitante)
+- Definição de funções/cargos
+- **Sincronização automática** de líderes para área pública
+- Aniversariantes do mês
+
+### 💰 Dízimos / Finanças / Ofertas
+
+- Lançar doações (dízimos e ofertas)
+- Registrar despesas
+- **Relatórios financeiros** detalhados
+- **Export CSV** para análise externa
+- **Lançamentos via PIX** (integração futura)
+- Categorização de transações
+- Dashboard com gráficos
+
+### 📅 Gestão de Eventos
+
+- Criação e edição de eventos
+- Categorias (Culto, Reunião, Social, Missão, Treinamento)
+- Controle de status (Agendado, Realizado, Cancelado)
+- Agenda pública no site
+
+### ✝️ Área do Pastor
+
+- Gerenciamento de **sermões** (com links do YouTube)
+- **Palavra do Pastor** (versículo da semana)
+- Publicação de mensagens e estudos bíblicos
+- Histórico de pregações
+
+### 🏠 Ministérios e Células
+
+- Cadastro de ministérios
+- Gestão de células (grupos pequenos)
+- Associação de líderes e membros
+- Relatórios de participação
+
+### 📸 Galeria de Mídia
+
+- Upload de fotos e vídeos para **Firebase Storage**
+- Organização por categorias
+- Controle de visualizações e curtidas
+- Mural estilo carrossel infinito
+
+### 💬 Testemunhos e Pedidos de Oração
+
+- **Sistema de moderação** de testemunhos
+- Formulário público de pedidos de oração
+- Aprovação e publicação
+- Exibição no site público
+
+### 📧 Comunicação
+
+- Integração com **e-mail**
+- Integração com **WhatsApp**
+- Envio de mensagens em massa (planejado)
+
+### 📋 Auditoria
+
+- Log de todas as ações do sistema
+- Rastreamento por usuário e módulo
+- Exportação de relatórios em CSV
+- Filtros por data, usuário e ação
+
+## 🌐 Site Público Institucional
+
+### Páginas Dinâmicas
+
+- ✅ **Home**: Hero section, próximos eventos, palavra do pastor, estatísticas, carrossel de fotos
 - ✅ **Sobre**: História e missão da igreja
 - ✅ **Liderança**: Pastores e equipe de intercessão (com emojis por gênero 👨👩)
-- ✅ **Agenda**: Calendário de eventos
+- ✅ **Agenda**: Calendário de eventos públicos
 - ✅ **Mensagens**: Últimos sermões com integração YouTube
 - ✅ **Galeria**: Fotos e vídeos dos eventos
 - ✅ **Testemunhos**: Histórias de vidas transformadas
 - ✅ **Pedidos de Oração**: Formulário público
 - ✅ **Contato**: Informações e formulário
 
-#### Recursos
+### Recursos
+
 - ✅ Design responsivo (mobile-first)
-- ✅ Carrossel de fotos
+- ✅ Carrossel de fotos automático
 - ✅ Integração com YouTube
 - ✅ Aniversariantes do mês
 - ✅ Estatísticas em tempo real
@@ -96,7 +164,7 @@ O **Sistema Igreja** é uma solução completa para gestão de igrejas que integ
 ### Backend & Infraestrutura
 - **Firebase Authentication** - Autenticação de usuários
 - **Cloud Firestore** - Banco de dados NoSQL em tempo real
-- **Firebase Storage** - Armazenamento de arquivos
+- **Firebase Storage** - Armazenamento de arquivos (fotos, vídeos)
 - **Firebase Hosting** - Hospedagem do site
 - **Firestore Security Rules** - Regras de segurança
 
@@ -147,14 +215,12 @@ sistema-igreja/
 │   │   │       ├── prayer-form/
 │   │   │       └── contact/
 │   │   ├── shared/                    # Componentes e modelos compartilhados
-│   │   │   ├── models/
-│   │   │   └── components/
 │   │   ├── app.component.ts
 │   │   ├── app.config.ts
 │   │   └── app.routes.ts
 │   ├── environments/
 │   │   ├── environment.ts             # Configuração de desenvolvimento
-│   │   └── environment.prod.ts        # Configuração de produção (gitignored)
+│   │   └── environment.prod.ts        # Configuração de produção
 │   ├── styles.scss                    # Estilos globais
 │   └── index.html
 ├── firestore.rules                    # Regras de segurança do Firestore
@@ -171,168 +237,42 @@ sistema-igreja/
 ### Coleções Principais
 
 #### `members` (Privada - Requer Autenticação)
-```typescript
-{
-  id: string;
-  churchId: string;
-  name: string;
-  email: string;
-  phone: string;
-  whatsapp: string;
-  birthDate?: Date;
-  gender?: 'masculino' | 'feminino';
-  joinDate: Date;
-  status: 'active' | 'inactive' | 'visiting';
-  role?: string;
-  photo?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
+Cadastro completo de membros com dados pessoais, contato e endereço.
 
 #### `public_leaders` (Pública - Leitura Aberta)
-```typescript
-{
-  id: string;
-  name: string;
-  role: string;
-  photo?: string;
-  email?: string;
-  gender?: string;
-  updatedAt: string;
-}
-```
-> **Nota**: Sincronizada automaticamente quando membros com cargo de "Pastor" ou "Intercessão" são criados/editados.
+Sincronizada automaticamente quando membros com cargo de "Pastor" ou "Intercessão" são criados/editados.
+Contém apenas dados seguros: nome, cargo, foto, email, gênero.
 
 #### `finance` (Privada)
-```typescript
-{
-  id: string;
-  churchId: string;
-  type: 'income' | 'expense';
-  category: string;
-  amount: number;
-  date: Date;
-  description?: string;
-  paymentMethod?: string;
-  createdAt: Date;
-}
-```
+Dízimos, ofertas e despesas com categorização e relatórios.
 
 #### `events` (Pública para leitura)
-```typescript
-{
-  id: string;
-  churchId: string;
-  name: string;
-  category: 'Culto' | 'Reunião' | 'Treinamento' | 'Social' | 'Missão' | 'Outra';
-  date: Date;
-  time: string;
-  location?: string;
-  description?: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
-  createdAt: Date;
-}
-```
+Eventos da igreja (cultos, reuniões, eventos sociais, missões).
 
 #### `pastor_words` (Pública para leitura)
-```typescript
-{
-  id: string;
-  churchId: string;
-  title: string;
-  content: string;
-  authorName: string;
-  isActive: boolean;
-  createdAt: Date;
-}
-```
+Palavra do pastor (versículo da semana).
 
 #### `sermons` (Pública para leitura)
-```typescript
-{
-  id: string;
-  churchId: string;
-  title: string;
-  pastor: string;
-  date: Date;
-  mediaUrl?: string;
-  scriptureReference?: string;
-  createdAt: Date;
-}
-```
+Sermões e pregações com links do YouTube.
 
 #### `media` (Pública para leitura)
-```typescript
-{
-  id: string;
-  churchId: string;
-  title: string;
-  description?: string;
-  type: 'photo' | 'video' | 'document';
-  mediaUrl: string;
-  status: 'draft' | 'published';
-  views?: number;
-  likes?: number;
-  createdAt: Date;
-}
-```
+Fotos e vídeos dos eventos (Firebase Storage).
 
 #### `testimonies` (Moderada)
-```typescript
-{
-  id: string;
-  churchId: string;
-  authorName: string;
-  title: string;
-  content: string;
-  category?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  isPublic: boolean;
-  createdAt: Date;
-}
-```
+Testemunhos de membros com sistema de aprovação.
 
 #### `prayer_requests` (Moderada)
-```typescript
-{
-  id: string;
-  churchId: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  request: string;
-  status: 'pending' | 'prayed';
-  isPublic: boolean;
-  createdAt: Date;
-}
-```
+Pedidos de oração com controle de privacidade.
 
 #### `audit_logs` (Privada - Apenas Admin)
-```typescript
-{
-  id: string;
-  userId: string;
-  userName: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT';
-  module: string;
-  details?: string;
-  timestamp: Date;
-}
-```
+Log completo de todas as ações do sistema.
 
 ## 🔐 Segurança
 
 ### Firestore Security Rules
 
-O sistema implementa regras de segurança rigorosas:
-
 - **Autenticação obrigatória** para acesso ao dashboard
-- **Controle de permissões** por função (admin, pastor, secretária)
+- **RBAC** (Role-Based Access Control) - Admin / Pastor / Secretaria
 - **Dados públicos separados** (coleção `public_leaders` para site)
 - **Proteção de dados sensíveis** (LGPD compliance)
 - **Auditoria completa** de todas as ações
@@ -356,7 +296,7 @@ O sistema implementa regras de segurança rigorosas:
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/sistema-igreja.git
+git clone https://github.com/futurannetdesign/sistema_igreja_.git
 cd sistema-igreja
 
 # Instale as dependências
@@ -425,7 +365,7 @@ Senha: frme1206
 
 > **Importante**: Altere essas credenciais após o primeiro acesso!
 
-### Criar Novo Usuário Admin
+### Criar Novo Usuário
 
 Use o Dashboard → Usuários → Novo Usuário
 
@@ -444,17 +384,6 @@ Use o Dashboard → Usuários → Novo Usuário
 - **Tailwind CSS**: Classes utilitárias para estilização rápida
 - **Componentes Reutilizáveis**: Cards, botões, formulários padronizados
 - **Animações Suaves**: Transições e hover effects
-
-## 📸 Screenshots
-
-### Dashboard
-![Dashboard](https://via.placeholder.com/800x400?text=Dashboard+Principal)
-
-### Site Público
-![Site Público](https://via.placeholder.com/800x400?text=Site+Público)
-
-### Gestão de Membros
-![Membros](https://via.placeholder.com/800x400?text=Gestão+de+Membros)
 
 ## 🔄 Sincronização de Dados
 
