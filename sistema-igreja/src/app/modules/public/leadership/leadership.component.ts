@@ -51,15 +51,20 @@ interface LeadershipGroup {
             <!-- Card de Membro (Pastor/Intercessão) -->
             <ng-container *ngIf="group.type === 'member'">
               <div *ngFor="let member of group.items" 
-                   class="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all hover:-translate-y-2">
-                <div class="aspect-square bg-gradient-to-br from-blue-100 to-purple-100 relative overflow-hidden">
-                  <img *ngIf="member.photo" [src]="member.photo" [alt]="member.name" class="w-full h-full object-cover">
-                  <div *ngIf="!member.photo" class="w-full h-full flex items-center justify-center text-6xl text-gray-400">👤</div>
+                   class="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all hover:-translate-y-2">
+                <div class="aspect-video bg-gradient-to-br from-blue-100 to-purple-100 relative overflow-hidden flex items-center justify-center">
+                  <img 
+                    *ngIf="member.photo && member.photo.trim() !== ''" 
+                    [src]="member.photo" 
+                    [alt]="member.name" 
+                    class="w-full h-full object-cover absolute inset-0"
+                    (error)="onImageError($event)">
+                  <div class="text-6xl text-gray-400 z-10">{{ getGenderEmoji(member.gender) }}</div>
                 </div>
-                <div class="p-6">
-                  <h3 class="text-xl font-bold text-gray-900 mb-1">{{ member.name }}</h3>
-                  <p class="text-primary-blue font-medium text-sm mb-3">{{ getRoleDisplay(member.role || 'Membro') }}</p>
-                  <div class="space-y-2 text-sm text-gray-600">
+                <div class="p-4">
+                  <h3 class="text-lg font-bold text-gray-900 mb-1">{{ member.name }}</h3>
+                  <p class="text-primary-blue font-medium text-sm mb-2">{{ getRoleDisplay(member.role || 'Membro') }}</p>
+                  <div class="space-y-1 text-sm text-gray-600">
                     <p *ngIf="member.email" class="flex items-center gap-2"><span>✉️</span> <a [href]="'mailto:' + member.email" class="hover:text-primary-blue truncate">{{ member.email }}</a></p>
                   </div>
                 </div>
@@ -119,12 +124,12 @@ export class LeadershipComponent implements OnInit {
     private cellsService: CellsDatabaseService
   ) {
     this.leadershipGroups$ = combineLatest([
-      this.membersService.getMembers(),
+      this.membersService.getPublicLeaders(), // Usar coleção pública
       this.ministriesService.getMinistries(),
       this.cellsService.getCells()
     ]).pipe(
       map(([members, ministries, cells]) => {
-        const activeMembers = members.filter(m => m.status === 'active');
+        // members aqui já são da coleção public_leaders
         
         return [
           {
@@ -132,7 +137,7 @@ export class LeadershipComponent implements OnInit {
             description: 'Nossa equipe pastoral dedicada ao ensino da Palavra e cuidado espiritual',
             icon: '✝️',
             type: 'member',
-            items: activeMembers.filter(m => 
+            items: members.filter(m => 
               m.role?.toLowerCase().includes('pastor')
             )
           },
@@ -141,7 +146,7 @@ export class LeadershipComponent implements OnInit {
             description: 'Equipe dedicada à oração e clamor pela igreja e nações',
             icon: '🙏',
             type: 'member',
-            items: activeMembers.filter(m => 
+            items: members.filter(m => 
               m.role?.toLowerCase().includes('intercessão') || 
               m.role?.toLowerCase().includes('intercessao') ||
               m.role?.toLowerCase().includes('oração')
@@ -170,5 +175,18 @@ export class LeadershipComponent implements OnInit {
 
   getRoleDisplay(role: string): string {
     return role;
+  }
+
+  getGenderEmoji(gender?: string): string {
+    if (!gender) return '👤';
+    const g = gender.toLowerCase();
+    if (g === 'feminino' || g === 'f' || g === 'mulher') return '👩';
+    if (g === 'masculino' || g === 'm' || g === 'homem') return '👨';
+    return '👤';
+  }
+
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.style.display = 'none';
   }
 }

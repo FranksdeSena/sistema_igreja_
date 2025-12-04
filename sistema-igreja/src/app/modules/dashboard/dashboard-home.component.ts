@@ -19,9 +19,21 @@ import { map } from 'rxjs/operators';
   template: `
     <div class="space-y-8">
       <!-- Título da Página -->
-      <div>
-        <h1 class="text-4xl font-bold text-gray-900">Dashboard Principal</h1>
-        <p class="text-gray-600 mt-2">Resumo das atividades e informações da chiesa</p>
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-4xl font-bold text-gray-900">Dashboard Principal</h1>
+          <p class="text-gray-600 mt-2">Resumo das atividades e informações da chiesa</p>
+        </div>
+        <!-- Botão Temporário de Migração -->
+        <button 
+          *ngIf="!migrationDone"
+          (click)="onMigrateLeaders()"
+          [disabled]="isMigrating"
+          class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 text-sm"
+        >
+          <span *ngIf="!isMigrating">🔄 Migrar Líderes</span>
+          <span *ngIf="isMigrating">⏳ Migrando...</span>
+        </button>
       </div>
 
       <!-- Media Viewer Modal -->
@@ -307,6 +319,8 @@ export class DashboardHomeComponent implements OnInit {
   recentSermons: Sermon[] = [];
   mediaGallery: MediaItem[] = [];
   isUploadingFile = false;
+  isMigrating = false;
+  migrationDone = false;
 
   // Media Viewer
   isViewerOpen = false;
@@ -415,13 +429,8 @@ export class DashboardHomeComponent implements OnInit {
   }
 
   formatDuration(seconds: number): string {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 
@@ -484,6 +493,22 @@ export class DashboardHomeComponent implements OnInit {
       this.selectedMediaIndex--;
       this.selectedMediaItem = this.mediaGallery[this.selectedMediaIndex];
       this.mediaService.incrementViews(this.selectedMediaItem.id);
+    }
+  }
+
+  async onMigrateLeaders(): Promise<void> {
+    if (confirm('Isso irá sincronizar todos os membros líderes para a coleção pública. Continuar?')) {
+      this.isMigrating = true;
+      try {
+        const result = await this.membersService.migrateLeadersToPublic();
+        alert(`Migração concluída!\n${result.success} membros processados\n${result.errors} erros`);
+        this.migrationDone = true;
+      } catch (error) {
+        console.error('Erro na migração:', error);
+        alert('Erro ao executar migração. Veja o console.');
+      } finally {
+        this.isMigrating = false;
+      }
     }
   }
 }

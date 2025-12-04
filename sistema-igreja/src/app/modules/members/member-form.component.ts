@@ -74,6 +74,15 @@ import { Member } from '../../shared/models';
               </div>
 
               <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Gênero</label>
+                <select formControlName="gender" class="input-field">
+                  <option value="">Não informado</option>
+                  <option value="masculino">Masculino</option>
+                  <option value="feminino">Feminino</option>
+                </select>
+              </div>
+
+              <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2"
                   >Data de Entrada *</label
                 >
@@ -191,6 +200,7 @@ export class MemberFormComponent implements OnInit {
       phone: ['', Validators.required],
       whatsapp: ['', Validators.required],
       birthDate: [''],
+      gender: [''],
       joinDate: ['', Validators.required],
       status: ['active', Validators.required],
       role: ['Membro'],
@@ -233,6 +243,7 @@ export class MemberFormComponent implements OnInit {
             phone: member.phone,
             whatsapp: member.whatsapp,
             birthDate: birthDateStr,
+            gender: member.gender || '',
             joinDate: joinDateStr,
             status: member.status,
             role: member.role,

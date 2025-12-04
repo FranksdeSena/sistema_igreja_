@@ -111,5 +111,11 @@ service cloud.firestore {
       allow write: if canManageMembers();
     }
 
+    // Regras para Líderes Públicos (Cópia segura para o site)
+    match /public_leaders/{leaderId} {
+      allow read: if true;
+      allow write: if canManageMembers();
+    }
+
   }
 }

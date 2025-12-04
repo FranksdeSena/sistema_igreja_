@@ -11,6 +11,7 @@ import {
   updateDoc, 
   deleteDoc, 
   addDoc,
+  setDoc,
   CollectionReference,
   DocumentData,
   onSnapshot
@@ -45,6 +46,9 @@ export class MembersDatabaseService {
     // Log de auditoria (executa em background, não bloqueia a operação)
     this.logAuditAction('CREATE', docRef.id, member.name, `Novo membro cadastrado: ${member.name}`);
     
+    // Sincronizar com coleção pública se for líder
+    this.syncPublicLeader(docRef.id, member).catch(err => console.error('Erro ao sincronizar líder público:', err));
+
     return docRef.id;
   }
 
@@ -205,6 +209,13 @@ export class MembersDatabaseService {
     if (beforeData) {
       this.logAuditAction('UPDATE', id, member.name || beforeData['name'], `Membro atualizado: ${member.name || beforeData['name']}`);
     }
+
+    // Sincronizar com coleção pública se for líder
+    // Precisamos mesclar os dados novos com os antigos para ter o objeto completo (ex: role pode não ter mudado)
+    if (beforeData) {
+      const mergedData = { ...beforeData, ...member };
+      this.syncPublicLeader(id, mergedData).catch(err => console.error('Erro ao sincronizar líder público:', err));
+    }
   }
 
   // Excluir Membro
@@ -220,6 +231,9 @@ export class MembersDatabaseService {
     if (beforeData) {
       this.logAuditAction('DELETE', id, beforeData['name'], `Membro excluído: ${beforeData['name']}`);
     }
+
+    // Remover da coleção pública
+    this.syncPublicLeader(id, null).catch(err => console.error('Erro ao remover líder público:', err));
   }
 
   // Buscar Membros (filtro simples local por enquanto, idealmente seria no banco)
@@ -267,5 +281,100 @@ export class MembersDatabaseService {
       birthDate: correctDate.toISOString(),
       updatedAt: new Date().toISOString()
     });
+  }
+
+  /**
+   * Sincroniza dados públicos de líderes (Pastores/Intercessão)
+   * para a coleção 'public_leaders' que tem leitura liberada
+   */
+  private async syncPublicLeader(memberId: string, memberData: Partial<Member> | null): Promise<void> {
+    const publicDocRef = doc(this.firestore, 'public_leaders', memberId);
+
+    // Se memberData for null, significa exclusão
+    if (!memberData) {
+      await deleteDoc(publicDocRef);
+      return;
+    }
+
+    const role = memberData.role?.toLowerCase() || '';
+    const isLeader = role.includes('pastor') || role.includes('intercessão') || role.includes('intercessao') || role.includes('oração');
+
+    if (isLeader) {
+      // É líder: Atualizar ou Criar na coleção pública
+      // Apenas dados seguros
+      const publicData = {
+        id: memberId,
+        name: memberData.name,
+        role: memberData.role,
+        photo: memberData.photo || null,
+        email: memberData.email || null, // Opcional, mas útil para contato
+        gender: memberData.gender || null,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Remove campos undefined/null se necessário, mas Firestore aceita null
+      await setDoc(publicDocRef, publicData, { merge: true });
+    } else {
+      // Não é líder (ou deixou de ser): Remover da coleção pública
+      await deleteDoc(publicDocRef);
+    }
+  }
+
+  // Buscar Líderes Públicos (para o site)
+  getPublicLeaders(): Observable<Member[]> {
+    const publicCollection = collection(this.firestore, 'public_leaders');
+    return new Observable<Member[]>(observer => {
+      const unsubscribe = onSnapshot(
+        publicCollection,
+        (snapshot) => {
+          const leaders = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              // Datas podem vir como string ou Timestamp
+              updatedAt: this.parseDate(data['updatedAt']) || new Date()
+            } as Member;
+          });
+          observer.next(leaders);
+        },
+        (error) => {
+          console.error('Erro ao buscar líderes públicos:', error);
+          observer.error(error);
+        }
+      );
+      return () => unsubscribe();
+    }).pipe(
+      catchError(() => of<Member[]>([]))
+    );
+  }
+
+  /**
+   * Migração inicial: Sincroniza todos os líderes existentes para public_leaders
+   * Este método deve ser executado UMA VEZ após a implementação da feature
+   */
+  async migrateLeadersToPublic(): Promise<{ success: number; errors: number }> {
+    const snapshot = await getDocs(this.membersCollection);
+    let success = 0;
+    let errors = 0;
+
+    for (const docSnap of snapshot.docs) {
+      try {
+        const member = {
+          id: docSnap.id,
+          ...docSnap.data()
+        } as Member;
+
+        // Sincronizar se for líder
+        await this.syncPublicLeader(member.id, member);
+        success++;
+      } catch (error) {
+        console.error(`Erro ao migrar membro ${docSnap.id}:`, error);
+        errors++;
+      }
+    }
+
+    console.log(`Migração concluída: ${success} membros processados, ${errors} erros`);
+    return { success, errors };
   }
 }

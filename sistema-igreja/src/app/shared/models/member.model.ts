@@ -7,6 +7,7 @@ export interface Member {
   phone: string;
   whatsapp: string;
   birthDate?: Date;
+  gender?: string;
   joinDate: Date;
   cellId?: string;
   status: 'active' | 'inactive' | 'visiting';
